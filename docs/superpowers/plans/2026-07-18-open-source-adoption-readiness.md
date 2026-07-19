@@ -44,4 +44,4 @@
 - [x] Build/install the wheel in a clean environment and run the Docker Compose newcomer path from a clean named volume.
 - [x] Use the in-app browser for desktop and mobile screenshots, interaction proof, page identity, nonblank rendering, accessibility state, and console health.
 - [x] Run an independent adoption review and resolve all P0–P2 issues that are in local scope.
-- [ ] Update `docs/dataset-foundry/` with exact proof boundaries, create the required 12-section `.mdc` handoff, commit the validated repository, and publish the new public repository to `ownasquare/dataset-foundry`.
+- [x] Update `docs/dataset-foundry/` with exact proof boundaries, create the required 12-section `.mdc` handoff, commit the validated repository, and publish the new public repository to `ownasquare/dataset-foundry`.
