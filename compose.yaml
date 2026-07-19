@@ -1,0 +1,51 @@
+name: dataset-foundry
+
+x-runtime: &runtime
+  build:
+    context: .
+  image: dataset-foundry:local
+  init: true
+  restart: unless-stopped
+  read_only: true
+  tmpfs:
+    - /tmp:size=64m,mode=1777
+  volumes:
+    - foundry-data:/data
+  environment:
+    DATASET_FOUNDRY_ENVIRONMENT: container
+    DATASET_FOUNDRY_DATA_DIR: /data
+    DATASET_FOUNDRY_ALLOW_UNAUTHENTICATED_CONTAINER_LOOPBACK: "true"
+    DATASET_FOUNDRY_DATABASE_URL: sqlite:////data/dataset-foundry.db
+    DATASET_FOUNDRY_ARTIFACT_DIR: /data/artifacts
+    DATASET_FOUNDRY_DEFAULT_PROVIDER: offline
+    DATASET_FOUNDRY_HOST: 0.0.0.0
+    DATASET_FOUNDRY_PORT: "8765"
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+
+services:
+  api:
+    <<: *runtime
+    command: ["serve"]
+    ports:
+      - "127.0.0.1:8765:8765"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8765/health', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+  worker:
+    <<: *runtime
+    command: ["worker"]
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      disable: true
+
+volumes:
+  foundry-data:
