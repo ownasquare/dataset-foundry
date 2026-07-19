@@ -10,7 +10,7 @@ import {
   ShieldCheck,
   X,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { useCandidates, useReviewCandidate, useRuns } from "../api/queries";
 import type { Candidate, CandidateDecision, ReviewDecision } from "../api/types";
@@ -33,7 +33,7 @@ function CandidatePreview({ candidate }: { candidate: Candidate }) {
   );
 }
 
-export function ReviewView() {
+export function ReviewView({ onGenerate }: { onGenerate: () => void }) {
   const runs = useRuns();
   const reviewableRuns = useMemo(
     () => (runs.data ?? []).filter((run) => run.status.startsWith("completed")),
@@ -56,6 +56,10 @@ export function ReviewView() {
     filtered[0] ??
     null;
 
+  useEffect(() => {
+    setNote(selected?.reviewerNote ?? "");
+  }, [selected?.id, selected?.reviewerNote]);
+
   const selectCandidate = (candidate: Candidate) => {
     setSelectedId(candidate.id);
     setNote(candidate.reviewerNote ?? "");
@@ -69,6 +73,8 @@ export function ReviewView() {
       { candidateId: selected.id, decision, note: note.trim() },
       {
         onSuccess: () => {
+          setSelectedId("");
+          setNote("");
           setConfirmation(
             decision === "accepted"
               ? "Candidate accepted"
@@ -95,7 +101,13 @@ export function ReviewView() {
       />
 
       {reviewableRuns.length === 0 ? (
-        <StatePanel kind="empty" title="No completed runs to review" message="Complete a generation run before reviewing candidate evidence." />
+        <StatePanel
+          kind="empty"
+          title="No completed runs to review"
+          message="Complete a generation run before reviewing candidate evidence."
+          actionLabel="Start generating"
+          onAction={onGenerate}
+        />
       ) : (
         <>
           <div className="review-toolbar">

@@ -14,6 +14,7 @@ from dataset_foundry.persistence.models import (
     ReviewRecord,
     RunRecord,
     SeedExampleRecord,
+    WorkerHeartbeatRecord,
 )
 from dataset_foundry.persistence.repositories import (
     AuditRepository,
@@ -29,6 +30,8 @@ from dataset_foundry.persistence.repositories import (
     Repositories,
     ReviewRepository,
     RunRepository,
+    WorkerHeartbeatRepository,
+    WorkerPresenceStatus,
 )
 
 __all__ = [
@@ -59,5 +62,8 @@ __all__ = [
     "RunRepository",
     "SeedExampleRecord",
     "SessionFactory",
+    "WorkerHeartbeatRecord",
+    "WorkerHeartbeatRepository",
+    "WorkerPresenceStatus",
     "session_scope",
 ]

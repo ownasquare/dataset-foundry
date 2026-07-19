@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -179,4 +180,49 @@ def test_sqlite_foreign_keys_are_enforced(tmp_path: Path) -> None:
                 row_count=0,
             )
         )
+    database.dispose()
+
+
+def test_worker_heartbeat_status_expires_and_stops(tmp_path: Path) -> None:
+    database = Database(tmp_path / "worker-heartbeats.sqlite3")
+    database.initialize()
+    repositories = Repositories(database.session_factory)
+    started_at = datetime(2026, 7, 18, 12, tzinfo=UTC)
+
+    missing = repositories.workers.status(now=started_at)
+    assert missing.ready is False
+    assert missing.state == "missing"
+
+    repositories.workers.heartbeat(
+        "worker-a",
+        state="idle",
+        ttl_seconds=30,
+        now=started_at,
+    )
+    idle = repositories.workers.status(now=started_at + timedelta(seconds=10))
+    assert idle.ready is True
+    assert idle.state == "idle"
+    assert idle.worker_id == "worker-a"
+
+    repositories.workers.heartbeat(
+        "worker-a",
+        state="busy",
+        current_job_id="job-123",
+        ttl_seconds=30,
+        now=started_at + timedelta(seconds=20),
+    )
+    busy = repositories.workers.status(now=started_at + timedelta(seconds=21))
+    assert busy.ready is True
+    assert busy.state == "busy"
+    assert busy.current_job_id == "job-123"
+
+    stale = repositories.workers.status(now=started_at + timedelta(seconds=51))
+    assert stale.ready is False
+    assert stale.state == "stale"
+
+    repositories.workers.stop("worker-a", now=started_at + timedelta(seconds=52))
+    stopped = repositories.workers.status(now=started_at + timedelta(seconds=52))
+    assert stopped.ready is False
+    assert stopped.state == "stopped"
+    assert stopped.current_job_id is None
     database.dispose()

@@ -8,20 +8,23 @@ Parquet files, or provider SDKs directly; the FastAPI service is the only produc
 ```mermaid
 flowchart LR
     UI["React workbench"] -->|"typed HTTP"| API["FastAPI API"]
-    CLI["CLI"] --> API
-    API --> DB[("SQLite source of truth")]
-    API --> JOBS["durable job queue"]
+    API --> SERVICES["application services"]
+    CLI["CLI"] --> SERVICES
+    SERVICES --> DB[("SQLite source of truth")]
+    SERVICES --> JOBS["durable job queue"]
     WORKER["generation worker"] --> JOBS
+    WORKER --> SERVICES
     WORKER --> PROVIDERS["offline / OpenAI / Anthropic"]
     WORKER --> QUALITY["quality + similarity gates"]
     QUALITY --> DB
-    API --> EXPORTS["immutable export service"]
+    SERVICES --> EXPORTS["immutable export service"]
     EXPORTS --> ARTIFACTS[("JSONL + Parquet artifacts")]
 ```
 
-The API and worker can run in one local checkout or as separate containers sharing a data volume.
-SQLite uses a single-writer operating posture; a multi-host deployment should replace the queue and
-database with infrastructure designed for distributed workers.
+The API, CLI, and worker assemble the same repositories and application services directly; CLI
+commands do not call back through HTTP. They can run in one local checkout or as separate containers
+sharing a data volume. SQLite uses a single-writer operating posture; a multi-host deployment should
+replace the queue and database with infrastructure designed for distributed workers.
 
 ## Core flow
 
@@ -60,8 +63,10 @@ actual split counts, artifact hashes, and sizes.
 
 Generation does not run inside an HTTP request. A queued job stores its lease owner, expiration, and
 heartbeat. A worker claims one job atomically, heartbeats during long work, fences writes by lease
-owner, and allows expired work to be recovered. Candidate uniqueness is enforced per run so a
-recovered batch cannot create duplicate accepted rows.
+owner, and allows expired work to be recovered. A separate persisted worker-presence heartbeat lets
+the API and workbench report `idle`, `busy`, `stale`, `stopped`, or `missing` without guessing from
+queued jobs. Candidate uniqueness is enforced per run so a recovered batch cannot create duplicate
+accepted rows.
 
 Terminal run states are `completed`, `failed`, and `cancelled`. A completed run is not reopened;
 users create a new recipe/run so provenance remains unambiguous.
@@ -93,4 +98,3 @@ experience remains a familiar data workflow.
 
 These layers must be reported separately. A green offline demo does not imply a live-provider or
 hosted deployment passed.
-

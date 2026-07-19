@@ -24,6 +24,7 @@ function useApi(): DatasetFoundryApi {
 }
 
 export const queryKeys = {
+  systemStatus: ["system-status"] as const,
   overview: ["overview"] as const,
   projects: ["projects"] as const,
   runs: ["runs"] as const,
@@ -33,6 +34,15 @@ export const queryKeys = {
   exports: ["exports"] as const,
   providers: ["providers"] as const,
 };
+
+export function useSystemStatus() {
+  const api = useApi();
+  return useQuery({
+    queryKey: queryKeys.systemStatus,
+    queryFn: ({ signal }) => api.getSystemStatus(signal),
+    refetchInterval: 5_000,
+  });
+}
 
 async function invalidateWorkspace(client: QueryClient): Promise<void> {
   await Promise.all([
@@ -102,6 +112,15 @@ export function useCreateRun() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: (input: CreateRunInput) => api.createRun(input),
+    onSuccess: () => invalidateWorkspace(client),
+  });
+}
+
+export function useCancelRun() {
+  const api = useApi();
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (runId: string) => api.cancelRun(runId),
     onSuccess: () => invalidateWorkspace(client),
   });
 }

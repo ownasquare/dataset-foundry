@@ -16,14 +16,25 @@ from dataset_foundry.domain import (
     MessageRole,
     ProviderName,
     ProviderTrace,
+    QualityComponent,
     TrainingExample,
 )
-from dataset_foundry.generation.service import GenerationService, select_batch_seeds
+from dataset_foundry.generation.service import (
+    GenerationService,
+    QualityPipelineFactory,
+    select_batch_seeds,
+)
 from dataset_foundry.ingestion import fingerprint_dataset
 from dataset_foundry.providers import ProviderRegistry
+from dataset_foundry.quality import QualityPipeline, ScoreResult
 
 
-def make_container(tmp_path: Path, *, frontend_dist: Path | None = None) -> Container:
+def make_container(
+    tmp_path: Path,
+    *,
+    frontend_dist: Path | None = None,
+    quality_pipeline_factory: QualityPipelineFactory | None = None,
+) -> Container:
     settings = Settings(
         environment="test",
         data_dir=tmp_path,
@@ -32,7 +43,7 @@ def make_container(tmp_path: Path, *, frontend_dist: Path | None = None) -> Cont
         frontend_dist=frontend_dist or tmp_path / "frontend-dist",
         _env_file=None,
     )
-    return Container(settings)
+    return Container(settings, quality_pipeline_factory=quality_pipeline_factory)
 
 
 def seeds() -> list[TrainingExample]:
@@ -80,6 +91,38 @@ def many_seeds(count: int) -> list[TrainingExample]:
         )
         for index in range(count)
     ]
+
+
+class RuntimeMarkerScorer:
+    def score(
+        self,
+        candidate: GeneratedCandidate,
+        *,
+        seed_similarity: float,
+        accepted_similarity: float,
+        constraints: list[str] | None = None,
+    ) -> ScoreResult:
+        del candidate, seed_similarity, accepted_similarity, constraints
+        component = QualityComponent(
+            name="runtime_extension",
+            score=1.0,
+            passed=True,
+            reason_code=None,
+            explanation="Proves the injected scorer reached the durable worker.",
+        )
+        return ScoreResult(score=1.0, components=(component,))
+
+
+def runtime_quality_factory(
+    *,
+    quality_threshold: float,
+    similarity_threshold: float,
+) -> QualityPipeline:
+    return QualityPipeline(
+        quality_threshold=quality_threshold,
+        similarity_threshold=similarity_threshold,
+        scorer=RuntimeMarkerScorer(),
+    )
 
 
 def test_large_seed_selection_is_stratified_rotating_and_replay_safe() -> None:
@@ -147,6 +190,20 @@ async def test_offline_pipeline_is_bounded_and_replay_safe(tmp_path: Path) -> No
     assert {
         record.candidate_fingerprint for record in container.repositories.candidates.list(run_id)
     } == first_fingerprints
+
+
+@pytest.mark.asyncio
+async def test_container_quality_factory_reaches_durable_worker(tmp_path: Path) -> None:
+    container = make_container(tmp_path, quality_pipeline_factory=runtime_quality_factory)
+    run_id = create_run(container, target_count=1)
+
+    result = await container.worker().run_once()
+
+    assert result is not None and result.status == "completed"
+    candidate = container.repositories.candidates.list(run_id)[0]
+    report = container.repositories.candidates.get_quality_report(candidate.id)
+    assert report is not None
+    assert [component.name for component in report.components] == ["runtime_extension"]
 
 
 @pytest.mark.asyncio

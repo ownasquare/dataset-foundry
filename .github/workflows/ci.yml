@@ -18,13 +18,14 @@ jobs:
         with:
           enable-cache: true
       - run: uv sync --frozen
-      - run: uv run ruff check src tests scripts
-      - run: uv run ruff format --check src tests scripts
+      - run: uv run ruff check src tests scripts examples
+      - run: uv run ruff format --check src tests scripts examples
       - run: uv run mypy src
       - run: uv run pytest -m "not live" --cov=dataset_foundry --cov-report=term-missing --cov-fail-under=80
       - run: uv run bandit -q -r src
       - run: uv run pip-audit
       - run: uv build
+      - run: uv run python examples/custom_scorer.py
       - run: uv run python scripts/benchmark_scale.py --count 250
       - run: uv run python scripts/benchmark_durable.py --count 250
 

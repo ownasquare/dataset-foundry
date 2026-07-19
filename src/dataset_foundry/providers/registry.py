@@ -66,7 +66,11 @@ class ProviderRegistry:
             providers.append(
                 {
                     "id": name.value,
-                    "label": name.value.replace("_", " ").title(),
+                    "label": (
+                        "OpenAI"
+                        if name is ProviderName.openai
+                        else name.value.replace("_", " ").title()
+                    ),
                     "configured": self.settings.provider_configured(name.value),
                     "live": name is not ProviderName.offline,
                     "requires_external_data_transfer": name is not ProviderName.offline,

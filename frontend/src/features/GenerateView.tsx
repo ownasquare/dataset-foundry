@@ -26,6 +26,7 @@ import {
 import type { PreflightRequest, ProviderKind, Run, SeedUploadResult } from "../api/types";
 import { Disclosure } from "../components/Disclosure";
 import { Dropzone } from "../components/Dropzone";
+import { InfoTip } from "../components/InfoTip";
 import { PageHeader } from "../components/PageHeader";
 import { StatePanel } from "../components/StatePanel";
 import { StatusBadge } from "../components/StatusBadge";
@@ -39,9 +40,11 @@ const MODEL_BY_PROVIDER: Record<ProviderKind, string> = {
 
 export function GenerateView({
   initialProjectId,
+  onCreateProject,
   onOpenRuns,
 }: {
   initialProjectId: string | null;
+  onCreateProject: () => void;
   onOpenRuns: () => void;
 }) {
   const projects = useProjects();
@@ -146,6 +149,8 @@ export function GenerateView({
         kind="empty"
         title="Create a project before generating"
         message="Projects keep seed data, recipes, quality decisions, and exports together."
+        actionLabel="Create a project"
+        onAction={onCreateProject}
       />
     );
   }
@@ -157,12 +162,6 @@ export function GenerateView({
         title="Generate a dataset"
         description="Import representative seeds, define a bounded recipe, and review exactly what will happen before work starts."
       />
-
-      <ol className="stepper" aria-label="Generation setup steps">
-        <li className="is-current"><span>1</span><div><strong>Seeds</strong><small>Choose the source</small></div></li>
-        <li><span>2</span><div><strong>Recipe</strong><small>Set quality bounds</small></div></li>
-        <li><span>3</span><div><strong>Preflight</strong><small>Review cost and privacy</small></div></li>
-      </ol>
 
       <div className="generation-layout">
         <div className="generation-layout__main">
@@ -305,9 +304,15 @@ export function GenerateView({
 
             <Disclosure summary="Quality and candidate limits">
               <div className="form-grid form-grid--three">
-                <label className="field">
-                  <span>Minimum quality</span>
+                <div className="field">
+                  <div className="field-heading">
+                    <label htmlFor="minimum-quality">Minimum quality</label>
+                    <InfoTip label="Minimum quality">
+                      Examples scoring below this value are not automatically accepted.
+                    </InfoTip>
+                  </div>
                   <input
+                    id="minimum-quality"
                     type="number"
                     min={0}
                     max={1}
@@ -315,10 +320,16 @@ export function GenerateView({
                     value={qualityThreshold}
                     onChange={(event) => setQualityThreshold(Number(event.target.value))}
                   />
-                </label>
-                <label className="field">
-                  <span>Similarity ceiling</span>
+                </div>
+                <div className="field">
+                  <div className="field-heading">
+                    <label htmlFor="similarity-ceiling">Similarity ceiling</label>
+                    <InfoTip label="Similarity ceiling">
+                      Candidates at or above this nearest-match score are treated as near duplicates.
+                    </InfoTip>
+                  </div>
                   <input
+                    id="similarity-ceiling"
                     type="number"
                     min={0}
                     max={1}
@@ -326,17 +337,23 @@ export function GenerateView({
                     value={similarityThreshold}
                     onChange={(event) => setSimilarityThreshold(Number(event.target.value))}
                   />
-                </label>
-                <label className="field">
-                  <span>Candidate multiplier</span>
+                </div>
+                <div className="field">
+                  <div className="field-heading">
+                    <label htmlFor="candidate-multiplier">Candidate multiplier</label>
+                    <InfoTip label="Candidate multiplier">
+                      Sets the maximum candidates evaluated per accepted-example target.
+                    </InfoTip>
+                  </div>
                   <input
+                    id="candidate-multiplier"
                     type="number"
                     min={1}
                     max={20}
                     value={candidateMultiplier}
                     onChange={(event) => setCandidateMultiplier(Number(event.target.value))}
                   />
-                </label>
+                </div>
               </div>
               <p className="detail-note">
                 The worker stops after accepting the target or evaluating {formatCount(targetCount * candidateMultiplier)} candidates. Exact duplicates always reject before scoring.

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import ClassVar
+from typing import ClassVar, Protocol
 
 from dataset_foundry.domain import GeneratedCandidate, MessageRole, QualityComponent
 from dataset_foundry.quality.embeddings import normalize_text
@@ -22,6 +22,20 @@ _BOILERPLATE = (
 class ScoreResult:
     score: float
     components: tuple[QualityComponent, ...]
+
+
+class CandidateScorer(Protocol):
+    """Replaceable scoring contract used by :class:`QualityPipeline`."""
+
+    def score(
+        self,
+        candidate: GeneratedCandidate,
+        *,
+        seed_similarity: float,
+        accepted_similarity: float,
+        constraints: list[str] | None = None,
+    ) -> ScoreResult:
+        """Return one bounded aggregate score plus explainable components."""
 
 
 def candidate_instruction(candidate: GeneratedCandidate) -> str:

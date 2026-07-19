@@ -24,7 +24,7 @@ import {
   formatExportFormat,
 } from "../components/format";
 
-export function ExportsView() {
+export function ExportsView({ onGenerate }: { onGenerate: () => void }) {
   const exportsQuery = useExports();
   const projects = useProjects();
   const runs = useRuns();
@@ -68,6 +68,7 @@ export function ExportsView() {
   };
 
   const ready = exportsQuery.data?.filter((item) => item.status === "ready") ?? [];
+  const hasCompletedRun = (runs.data ?? []).some((run) => run.status.startsWith("completed"));
   const readyPackages = Array.from(
     new Map(ready.map((item) => [item.exportId, item])).values(),
   );
@@ -160,7 +161,15 @@ export function ExportsView() {
 
       {exportsQuery.isPending ? <StatePanel kind="loading" /> : null}
       {exportsQuery.isError ? <StatePanel kind="error" message={exportsQuery.error.message} onRetry={() => void exportsQuery.refetch()} /> : null}
-      {exportsQuery.data?.length === 0 ? <StatePanel kind="empty" title="No exports yet" message="Complete review, then package accepted examples for fine-tuning." /> : null}
+      {exportsQuery.data?.length === 0 ? (
+        <StatePanel
+          kind="empty"
+          title="No exports yet"
+          message="Complete review, then package accepted examples for fine-tuning."
+          actionLabel={hasCompletedRun ? "Create first export" : "Start generating"}
+          onAction={hasCompletedRun ? () => setShowBuilder(true) : onGenerate}
+        />
+      ) : null}
       {exportsQuery.data?.length ? (
         <section className="panel" aria-labelledby="export-history-title">
           <div className="panel-heading"><div><p className="eyebrow">Artifact history</p><h2 id="export-history-title">Dataset packages</h2></div></div>

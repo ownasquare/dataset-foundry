@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import math
 from collections.abc import Callable
+from typing import Protocol
 
 from dataset_foundry.domain import (
     CandidateDecision,
@@ -24,6 +25,31 @@ from dataset_foundry.quality import QualityPipeline
 
 class CandidateBudgetExhaustedError(RuntimeError):
     """The bounded generation plan ended before enough candidates were accepted."""
+
+
+class QualityPipelineFactory(Protocol):
+    """Construct the per-run quality pipeline used by the durable worker."""
+
+    def __call__(
+        self,
+        *,
+        quality_threshold: float,
+        similarity_threshold: float,
+    ) -> QualityPipeline:
+        """Return a configured pipeline for one persisted recipe."""
+
+
+def default_quality_pipeline_factory(
+    *,
+    quality_threshold: float,
+    similarity_threshold: float,
+) -> QualityPipeline:
+    """Build the default explainable scorer and lexical-similarity pipeline."""
+
+    return QualityPipeline(
+        quality_threshold=quality_threshold,
+        similarity_threshold=similarity_threshold,
+    )
 
 
 _MAX_PROVIDER_SEEDS = 100
@@ -82,9 +108,16 @@ def candidate_from_record(record: CandidateRecord) -> GeneratedCandidate:
 class GenerationService:
     """Create queued runs and execute their deterministic, bounded generation loop."""
 
-    def __init__(self, repositories: Repositories, providers: ProviderRegistry) -> None:
+    def __init__(
+        self,
+        repositories: Repositories,
+        providers: ProviderRegistry,
+        *,
+        quality_pipeline_factory: QualityPipelineFactory | None = None,
+    ) -> None:
         self.repositories = repositories
         self.providers = providers
+        self.quality_pipeline_factory = quality_pipeline_factory or default_quality_pipeline_factory
 
     def enqueue(self, *, dataset_id: str, recipe_id: str) -> RunRecord:
         dataset = self.repositories.datasets.get(dataset_id)
@@ -143,7 +176,7 @@ class GenerationService:
         if not seeds:
             raise ValueError("run dataset contains no seed examples")
         provider = self.providers.get(recipe.provider, recipe.model)
-        quality = QualityPipeline(
+        quality = self.quality_pipeline_factory(
             quality_threshold=recipe.quality_threshold,
             similarity_threshold=recipe.similarity_threshold,
         )

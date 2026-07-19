@@ -319,6 +319,8 @@ export function createDemoApi(options: { latencyMs?: number } = {}): DatasetFoun
   };
 
   return {
+    getSystemStatus: () =>
+      respond({ apiReady: true, workerReady: true, workerState: "idle" as const }),
     getOverview: () => respond(overview(projects, runs, exports)),
     listProjects: () => respond(projects),
     async createProject(input: CreateProjectInput) {
@@ -414,6 +416,18 @@ export function createDemoApi(options: { latencyMs?: number } = {}): DatasetFoun
         item.id === input.projectId ? { ...item, activeRunId: run.id, lastActivity: NOW } : item,
       );
       return respond(run);
+    },
+    async cancelRun(runId: string) {
+      const current = runs.find((run) => run.id === runId);
+      if (!current || !["queued", "running"].includes(current.status)) {
+        throw new Error("Only queued or running runs can be cancelled.");
+      }
+      const cancelled: Run = { ...current, status: "cancelled", completedAt: NOW };
+      runs = runs.map((run) => (run.id === runId ? cancelled : run));
+      projects = projects.map((project) =>
+        project.activeRunId === runId ? { ...project, activeRunId: null } : project,
+      );
+      return respond(cancelled);
     },
     listCandidates: (runId: string, decision) =>
       respond({

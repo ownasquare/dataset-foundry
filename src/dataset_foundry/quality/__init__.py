@@ -8,6 +8,7 @@ from dataset_foundry.quality.embeddings import (
 )
 from dataset_foundry.quality.pipeline import QualityPipeline, training_example_text
 from dataset_foundry.quality.scorers import (
+    CandidateScorer,
     ExplainableScorer,
     ScoreResult,
     candidate_instruction,
@@ -23,6 +24,7 @@ from dataset_foundry.quality.similarity import (
 )
 
 __all__ = [
+    "CandidateScorer",
     "EmbeddingProvider",
     "EmbeddingVector",
     "ExplainableScorer",

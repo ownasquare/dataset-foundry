@@ -25,25 +25,40 @@ historical run-to-export evidence must be preserved.
 - `/health` proves the API process is accepting requests.
 - `/ready` verifies application initialization and database access.
 - `/metrics` exposes bounded operational counts; it is not a full telemetry backend.
+- `/api/v1/system/status` combines API readiness with persisted worker-heartbeat state. The worker
+  is ready only while an `idle` or `busy` heartbeat remains current.
 - `dataset-foundry doctor` checks settings, storage, database, frontend assets, and provider
   readiness without exposing secrets.
 
+If the workbench reports **API ready · worker offline**, start `uv run dataset-foundry worker` in a
+second terminal. With containers, use `docker compose up --build --wait`; the worker is part of that
+stack.
+
 ## Recovery
 
-A worker lease includes an expiration and heartbeat. If a worker exits mid-batch, another worker may
-claim the job after lease expiry. Candidate uniqueness makes replay idempotent. Operators should
+A worker lease includes an expiration and heartbeat, while a separate persisted presence heartbeat
+lets the API distinguish `idle`, `busy`, `stale`, `stopped`, and `missing` workers. If a worker exits
+mid-batch, another worker may claim the job after lease expiry. Candidate uniqueness makes replay idempotent. Operators should
 inspect the run event log and candidate counts before retrying a failed provider run; terminal runs
 remain immutable, so changed settings use a new run.
 
 ## Containers
 
 ```bash
-docker compose up --build
+make quickstart
 ```
 
-Compose publishes only `127.0.0.1:8765`, runs API and worker as non-root, shares one named data
-volume, drops capabilities, and keeps the root filesystem read-only. The Compose path does not
-inject live-provider keys by default.
+The quickstart runs `docker compose up --build --wait`. A one-shot bootstrap service idempotently
+prepares the offline sample before the API starts; the API and worker then share the same named data
+volume. Compose publishes only `127.0.0.1:8765`, runs as non-root, drops capabilities, and keeps the
+root filesystem read-only. It does not inject live-provider keys by default.
+
+When an operator explicitly sets `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` in the repository `.env`,
+Compose passes it to both the API and worker. Blank or absent keys remain unconfigured, and the
+bootstrap service still uses the offline provider.
+
+Use `make stop` to keep the volume. `make reset-demo` removes the volume and therefore deletes the
+container-backed database and artifacts.
 
 ## Scaling
 

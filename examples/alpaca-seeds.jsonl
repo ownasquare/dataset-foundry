@@ -1,0 +1,2 @@
+{"instruction":"How do I change the billing contact?","input":"The account owner is already signed in.","output":"Open Billing settings, update the contact, save it, and verify the confirmation message."}
+{"instruction":"What should I do about a duplicate pending charge?","input":"Only one order appears in order history.","output":"Verify the single order, explain temporary authorizations, and escalate if both charges settle."}

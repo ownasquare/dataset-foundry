@@ -187,10 +187,29 @@ def demo(
             },
         )
         recipe_record = container.repositories.recipes.create(dataset.id, recipe)
+
+    completed_run = next(
+        (
+            record
+            for record in container.repositories.runs.list(dataset_id=dataset.id, limit=10_000)
+            if record.recipe_id == recipe_record.id
+            and record.status == RunStatus.completed.value
+            and container.repositories.exports.list(record.id)
+        ),
+        None,
+    )
+    if completed_run is not None:
+        existing_export = container.repositories.exports.list(completed_run.id)[0]
+        console.print(
+            f"Offline demo already ready: {completed_run.accepted_count} accepted examples; "
+            f"export {existing_export.id} at {existing_export.output_path}"
+        )
+        return
+
     run = container.generation.enqueue(dataset_id=dataset.id, recipe_id=recipe_record.id)
     try:
         asyncio.run(_process_until_terminal(container, run.id))
-        export = container.create_export(run.id)
+        export = container.create_export(run.id, export_id=f"demo-export-{target_count}")
     except RuntimeError as exc:
         console.print(f"Demo failed: {exc}")
         raise typer.Exit(code=1) from exc

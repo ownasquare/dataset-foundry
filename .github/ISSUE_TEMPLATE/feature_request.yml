@@ -1,0 +1,37 @@
+name: Feature request
+description: Propose a focused improvement to the core workflow
+title: "[Feature]: "
+labels: ["enhancement", "needs-triage"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: Describe the user and the workflow friction, not only a proposed implementation.
+    validations:
+      required: true
+  - type: dropdown
+    id: stage
+    attributes:
+      label: Core stage
+      options:
+        - Import
+        - Generate
+        - Review
+        - Export
+        - Extension or contributor experience
+        - Operations
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome
+      description: Explain what becomes simpler, safer, or more understandable.
+    validations:
+      required: true
+  - type: textarea
+    id: boundaries
+    attributes:
+      label: Safety and compatibility considerations
+      description: Note privacy, provider cost, schema, migration, or artifact compatibility risks.

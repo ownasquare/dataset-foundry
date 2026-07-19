@@ -14,6 +14,7 @@ import type {
   ReviewInput,
   Run,
   SeedUploadResult,
+  SystemStatus,
 } from "./types";
 
 const API_ROOT = "/api/v1";
@@ -380,6 +381,7 @@ interface PreflightWire {
   estimated_tokens?: number;
   external_data_transfer_required?: boolean;
   blockers?: string[];
+  worker_ready?: boolean;
 }
 
 function buildOverview(payload: OverviewWire, runs: Run[]): OverviewData {
@@ -419,6 +421,18 @@ function buildOverview(payload: OverviewWire, runs: Run[]): OverviewData {
 }
 
 export const httpApi: DatasetFoundryApi = {
+  async getSystemStatus(signal) {
+    const payload = await fetchJson<Record<string, unknown>>(
+      "/system/status",
+      signal ? { signal } : {},
+    );
+    return {
+      apiReady: Boolean(payload.api_ready ?? true),
+      workerReady: Boolean(payload.worker_ready),
+      workerState: String(payload.worker_state ?? "missing") as SystemStatus["workerState"],
+    };
+  },
+
   async getOverview(signal) {
     const [payload, runs] = await Promise.all([
       fetchJson<OverviewWire>("/overview", signal ? { signal } : {}),
@@ -493,11 +507,12 @@ export const httpApi: DatasetFoundryApi = {
       },
     );
     const blockers = result.blockers ?? [];
+    const workerReady = Boolean(result.worker_ready);
     const externalTransfer = Boolean(result.external_data_transfer_required);
     const transferReady = !externalTransfer || input.allowExternalDataTransfer;
     return {
       recipeId,
-      ready: Boolean(result.ready),
+      ready: Boolean(result.ready) && workerReady,
       seedCount: Number(result.seed_count ?? 0),
       targetCount: input.targetCount,
       maximumCandidates: Number(result.candidate_budget ?? input.targetCount * input.candidateMultiplier),
@@ -506,9 +521,14 @@ export const httpApi: DatasetFoundryApi = {
       estimatedCostUsd: null,
       provider: String(result.provider ?? input.provider) as ProviderKind,
       model: String(result.model ?? input.model),
-      warnings: externalTransfer
-        ? ["Seed content will be sent to the selected external provider."]
-        : [],
+      warnings: [
+        ...(externalTransfer
+          ? ["Seed content will be sent to the selected external provider."]
+          : []),
+        ...(!workerReady
+          ? ["No active worker was detected. Start `uv run dataset-foundry worker`."]
+          : []),
+      ],
       checks: [
         {
           label: "Recipe readiness",
@@ -519,6 +539,13 @@ export const httpApi: DatasetFoundryApi = {
           label: "Candidate budget",
           passed: Number(result.candidate_budget ?? 0) > 0,
           detail: `At most ${Number(result.candidate_budget ?? 0).toLocaleString()} candidates.`,
+        },
+        {
+          label: "Worker availability",
+          passed: workerReady,
+          detail: workerReady
+            ? "A generation worker is ready to process this run."
+            : "Start `uv run dataset-foundry worker` before queueing the run.",
         },
         {
           label: "Data transfer",
@@ -550,6 +577,14 @@ export const httpApi: DatasetFoundryApi = {
         allow_external_data_transfer: input.allowExternalDataTransfer,
       }),
     });
+    return runFromWire(payload);
+  },
+
+  async cancelRun(runId: string) {
+    const payload = await fetchJson<Record<string, unknown>>(
+      `/runs/${encodeURIComponent(runId)}/cancel`,
+      { method: "POST" },
+    );
     return runFromWire(payload);
   },
 

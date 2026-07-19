@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 
-import { useRuns } from "../api/queries";
+import { useCancelRun, useRuns } from "../api/queries";
 import type { Run, RunStatus } from "../api/types";
 import { Disclosure } from "../components/Disclosure";
 import { MetricCard } from "../components/MetricCard";
@@ -30,10 +30,18 @@ function matchesFilter(run: Run, filter: RunFilter): boolean {
   return run.status === "failed" || run.status === "completed_with_review";
 }
 
-export function RunsView({ onReview }: { onReview: () => void }) {
+export function RunsView({
+  onGenerate,
+  onReview,
+}: {
+  onGenerate: () => void;
+  onReview: () => void;
+}) {
   const runs = useRuns();
+  const cancelRun = useCancelRun();
   const [filter, setFilter] = useState<RunFilter>("all");
   const [selectedId, setSelectedId] = useState("");
+  const [confirmation, setConfirmation] = useState("");
 
   const filtered = useMemo(
     () => (runs.data ?? []).filter((run) => matchesFilter(run, filter)),
@@ -90,7 +98,7 @@ export function RunsView({ onReview }: { onReview: () => void }) {
             key={item}
             type="button"
             aria-pressed={filter === item}
-            onClick={() => { setFilter(item); setSelectedId(""); }}
+            onClick={() => { setFilter(item); setSelectedId(""); setConfirmation(""); }}
           >
             {item === "all" ? "All runs" : item === "attention" ? "Needs attention" : item[0]?.toUpperCase() + item.slice(1)}
           </button>
@@ -98,7 +106,13 @@ export function RunsView({ onReview }: { onReview: () => void }) {
       </div>
 
       {runs.data.length === 0 ? (
-        <StatePanel kind="empty" title="No generation runs" message="Configure a bounded recipe to create the first run." />
+        <StatePanel
+          kind="empty"
+          title="No generation runs"
+          message="Configure a bounded recipe to create the first run."
+          actionLabel="Start generating"
+          onAction={onGenerate}
+        />
       ) : null}
 
       {runs.data.length ? (
@@ -107,20 +121,22 @@ export function RunsView({ onReview }: { onReview: () => void }) {
             <div className="panel-heading">
               <div>
                 <p className="eyebrow">Run history</p>
-                <h2 id="run-list-title">{filtered.length} matching runs</h2>
+                <h2 id="run-list-title">
+                  {filtered.length} matching {filtered.length === 1 ? "run" : "runs"}
+                </h2>
               </div>
             </div>
             {filtered.length ? (
               <div className="run-list">
                 {filtered.map((run) => {
-                  const progress = run.targetCount ? run.generatedCount / run.targetCount : 0;
+                  const progress = run.targetCount ? run.acceptedCount / run.targetCount : 0;
                   return (
                     <button
                       className={`run-row${selected?.id === run.id ? " is-selected" : ""}`}
                       type="button"
                       key={run.id}
                       aria-pressed={selected?.id === run.id}
-                      onClick={() => setSelectedId(run.id)}
+                      onClick={() => { setSelectedId(run.id); setConfirmation(""); }}
                     >
                       <span className="run-row__main">
                         <strong>{run.name}</strong>
@@ -149,9 +165,9 @@ export function RunsView({ onReview }: { onReview: () => void }) {
               <h2 id="selected-run-title">{selected.name}</h2>
               <p>{selected.projectName}</p>
               <ProgressBar
-                value={selected.generatedCount}
+                value={selected.acceptedCount}
                 max={selected.targetCount}
-                label={`${formatCount(selected.generatedCount)} of ${formatCount(selected.targetCount)} evaluated`}
+                label={`${formatCount(selected.acceptedCount)} of ${formatCount(selected.targetCount)} accepted · ${formatCount(selected.generatedCount)} evaluated`}
               />
               <dl className="definition-grid">
                 <div><dt>Accepted</dt><dd>{formatCount(selected.acceptedCount)}</dd></div>
@@ -164,10 +180,26 @@ export function RunsView({ onReview }: { onReview: () => void }) {
                   Review {formatCount(selected.reviewCount)} candidates
                 </button>
               ) : null}
-              {selected.status === "running" ? (
-                <button className="button button--secondary button--full" type="button" disabled>
-                  <CircleStop size={16} /> Cancellation available from API
+              {selected.status === "running" || selected.status === "queued" ? (
+                <button
+                  className="button button--secondary button--danger button--full"
+                  type="button"
+                  disabled={cancelRun.isPending}
+                  onClick={() => {
+                    if (!window.confirm("Cancel this generation run? Accepted work is preserved.")) return;
+                    cancelRun.mutate(selected.id, {
+                      onSuccess: () => setConfirmation("Run cancelled"),
+                    });
+                  }}
+                >
+                  <CircleStop size={16} /> {cancelRun.isPending ? "Cancelling…" : "Cancel run"}
                 </button>
+              ) : null}
+              {confirmation ? (
+                <p className="inline-success" role="status"><CheckCircle2 size={16} /> {confirmation}</p>
+              ) : null}
+              {cancelRun.isError ? (
+                <p className="form-error" role="alert">{cancelRun.error.message}</p>
               ) : null}
               <Disclosure summary="Recipe and provenance">
                 <dl className="detail-list">

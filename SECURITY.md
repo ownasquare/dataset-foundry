@@ -2,13 +2,17 @@
 
 ## Supported versions
 
-Security fixes are applied to the current `main` branch and the latest tagged release.
+Before the first tagged release, security fixes are applied to the current `main` branch. After a
+release is tagged, the latest release and `main` are supported.
 
 ## Reporting a vulnerability
 
-Please report suspected vulnerabilities privately to the repository owner. Include a minimal
-reproduction, affected version, impact, and any suggested mitigation. Do not attach provider keys,
-customer training data, private prompts, or generated artifacts.
+Use [GitHub private vulnerability reporting](https://github.com/ownasquare/dataset-foundry/security/advisories/new).
+If that option is temporarily unavailable, use the private contact method on the maintainer's
+GitHub profile rather than opening a public issue.
+
+Include a minimal reproduction, affected version, impact, and any suggested mitigation. Do not
+attach provider keys, customer training data, private prompts, databases, or generated artifacts.
 
 ## Security boundaries
 
@@ -22,4 +26,3 @@ customer training data, private prompts, or generated artifacts.
 When binding to a non-loopback interface, configure an API key and terminate TLS at a trusted
 reverse proxy. Treat imported seeds, provider prompts, candidate text, and exports as sensitive
 customer data.
-

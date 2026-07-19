@@ -82,8 +82,25 @@ def test_http_seed_to_export_workflow(tmp_path: Path) -> None:
     preflight = client.post(f"/api/v1/recipes/{recipe['id']}/preflight", json={})
     assert preflight.status_code == 200, preflight.text
     assert preflight.json()["ready"] is True
+    assert preflight.json()["worker_ready"] is False
     assert preflight.json()["seed_count"] == 2
     assert preflight.json()["candidate_budget"] == 15
+
+    api_only_status = client.get("/api/v1/system/status")
+    assert api_only_status.status_code == 200
+    assert api_only_status.json()["api_ready"] is True
+    assert api_only_status.json()["worker_ready"] is False
+    assert api_only_status.json()["worker_state"] == "missing"
+
+    container.repositories.workers.heartbeat(
+        "api-test-worker",
+        state="idle",
+        ttl_seconds=30,
+    )
+    ready_preflight = client.post(f"/api/v1/recipes/{recipe['id']}/preflight", json={})
+    assert ready_preflight.status_code == 200
+    assert ready_preflight.json()["ready"] is True
+    assert ready_preflight.json()["worker_ready"] is True
 
     queued = client.post(
         "/api/v1/runs",
@@ -156,6 +173,10 @@ def test_http_seed_to_export_workflow(tmp_path: Path) -> None:
     providers = client.get("/api/v1/providers")
     assert providers.status_code == 200
     assert "api_key" not in providers.text.lower()
+    assert (
+        next(item["label"] for item in providers.json()["providers"] if item["id"] == "openai")
+        == "OpenAI"
+    )
 
 
 def test_http_worker_accepts_seed_datasets_larger_than_provider_context(tmp_path: Path) -> None:
@@ -378,8 +399,10 @@ def test_api_key_protects_data_and_metrics_but_not_the_spa(tmp_path: Path) -> No
     assert client.get("/health").status_code == 200
     assert client.get("/ready").status_code == 200
     assert client.get("/api/v1/projects").status_code == 401
+    assert client.get("/api/v1/system/status").status_code == 401
     assert client.get("/metrics").status_code == 401
 
     headers = {"X-API-Key": api_key}
     assert client.get("/api/v1/projects", headers=headers).status_code == 200
+    assert client.get("/api/v1/system/status", headers=headers).status_code == 200
     assert client.get("/metrics", headers=headers).status_code == 200

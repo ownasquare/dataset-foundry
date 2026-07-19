@@ -11,7 +11,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 def _default_frontend_dist() -> Path:
-    return Path(__file__).resolve().parents[2] / "frontend" / "dist"
+    return Path(__file__).resolve().parent / "static"
 
 
 class Settings(BaseSettings):

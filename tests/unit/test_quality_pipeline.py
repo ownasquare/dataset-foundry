@@ -7,9 +7,15 @@ from dataset_foundry.domain import (
     MessageRole,
     ProviderName,
     ProviderTrace,
+    QualityComponent,
     TrainingExample,
 )
-from dataset_foundry.quality import EmbeddingVector, LexicalHashEmbedder, QualityPipeline
+from dataset_foundry.quality import (
+    EmbeddingVector,
+    LexicalHashEmbedder,
+    QualityPipeline,
+    ScoreResult,
+)
 
 
 class CountingEmbedder:
@@ -31,6 +37,18 @@ class CountingEmbedder:
 
     def embed_many(self, texts: list[str]) -> list[EmbeddingVector]:
         return [self.embed(text) for text in texts]
+
+
+class FixedScorer:
+    def score(self, *_args: object, **_kwargs: object) -> ScoreResult:
+        component = QualityComponent(
+            name="policy_grounding",
+            score=0.2,
+            passed=False,
+            reason_code="policy_not_grounded",
+            explanation="The answer does not cite an allowed policy fact.",
+        )
+        return ScoreResult(score=0.2, components=(component,))
 
 
 def candidate(identifier: str, instruction: str, response: str) -> GeneratedCandidate:
@@ -164,3 +182,17 @@ def test_evaluate_many_embeds_each_seed_and_candidate_only_once() -> None:
     QualityPipeline(embedder=embedder).evaluate_many(generated, seeds=[seed])
 
     assert embedder.embed_calls == len(generated) + 1
+
+
+def test_quality_pipeline_accepts_an_injected_scorer() -> None:
+    generated = candidate(
+        "custom-score",
+        "Which policy applies to a late refund request?",
+        "Ask a manager because the applicable policy has not been identified.",
+    )
+
+    report = QualityPipeline(scorer=FixedScorer(), quality_threshold=0.7).evaluate(generated)
+
+    assert report.decision is CandidateDecision.rejected
+    assert "policy_not_grounded" in report.reason_codes
+    assert report.components[0].name == "policy_grounding"

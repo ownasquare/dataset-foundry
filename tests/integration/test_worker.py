@@ -49,6 +49,62 @@ async def test_worker_returns_none_when_queue_is_empty(tmp_path: Path) -> None:
 
 
 @pytest.mark.asyncio
+async def test_long_running_worker_reports_idle_and_graceful_stop(tmp_path: Path) -> None:
+    container = make_container(tmp_path)
+    stop = asyncio.Event()
+    worker = Worker(
+        container.repositories,
+        container.generation,
+        worker_id="presence-idle-test",
+        lease_seconds=30,
+        heartbeat_seconds=0.01,
+        poll_seconds=0.01,
+    )
+
+    worker_task = asyncio.create_task(worker.run_forever(stop))
+    await asyncio.sleep(0)
+    status = container.repositories.workers.status()
+    assert status.ready is True
+    assert status.state == "idle"
+    assert status.worker_id == "presence-idle-test"
+
+    stop.set()
+    await asyncio.wait_for(worker_task, timeout=1)
+    stopped = container.repositories.workers.status()
+    assert stopped.ready is False
+    assert stopped.state == "stopped"
+
+
+@pytest.mark.asyncio
+async def test_long_running_worker_reports_busy_while_processing(tmp_path: Path) -> None:
+    container = make_container(tmp_path)
+    create_run(container, target_count=3)
+    generation = BlockingGeneration()
+    worker = Worker(
+        container.repositories,
+        cast(GenerationService, generation),
+        worker_id="presence-busy-test",
+        lease_seconds=30,
+        heartbeat_seconds=0.01,
+        poll_seconds=0.01,
+    )
+
+    worker_task = asyncio.create_task(worker.run_forever())
+    await asyncio.wait_for(generation.started.wait(), timeout=1)
+    status = container.repositories.workers.status()
+    assert status.ready is True
+    assert status.state == "busy"
+    assert status.worker_id == "presence-busy-test"
+    assert status.current_job_id is not None
+
+    worker_task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await worker_task
+    assert generation.cancelled.is_set()
+    assert container.repositories.workers.status().state == "stopped"
+
+
+@pytest.mark.asyncio
 async def test_worker_periodically_renews_and_interrupts_generation_on_lease_loss(
     tmp_path: Path,
 ) -> None:

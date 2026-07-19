@@ -1,75 +1,87 @@
 # Getting started
 
-Dataset Foundry includes an offline deterministic provider, so the complete seed-to-export workflow
-can be evaluated without an API key.
+The fastest path is fully offline and does not require a provider account.
 
-## Prerequisites
+## Docker quickstart
 
-- Python 3.11 or newer
-- uv
-- Node.js 20 or newer for frontend development
-- Docker Desktop or another Compose-compatible runtime only for the container path
-
-## Install
+Prerequisites: Docker Desktop or another Compose-compatible runtime, plus `make`.
 
 ```bash
-uv sync --frozen
-npm --prefix frontend ci
-npm --prefix frontend run build
+make quickstart
 ```
 
-Copy `.env.example` to `.env` only when local settings need to change. Do not commit `.env` or put
-provider keys in any `VITE_` variable; browser-prefixed environment values are public.
+Open `http://127.0.0.1:8765`. The command builds the locked app, starts the API and worker, and
+idempotently creates:
 
-## One-command offline demo
+- the **Customer Support Demo** project;
+- the versioned customer-support seed dataset;
+- a completed 25-example offline generation; and
+- canonical, OpenAI chat, Alpaca, and Parquet exports.
+
+The bootstrap is safe to run again; it reuses the completed demo export instead of duplicating it.
 
 ```bash
+make stop
+```
+
+`make stop` preserves the named data volume. `make reset-demo` deletes that volume and all local
+Docker demo data, so use it only when a clean workspace is intended.
+
+## Five-minute product tour
+
+1. On **Overview**, confirm that Customer Support Demo has 25 accepted examples.
+2. Open **Review**, select the **Accepted** filter, and inspect source and quality evidence.
+3. Open **Exports** and download one fine-tuning artifact.
+4. Open **Generate**, keep the offline provider selected, import
+   `examples/customer-support-seeds.jsonl`, and run the preflight before generating.
+
+Projects, Runs, and Settings are available under **More**. They are supporting views, not required
+to understand the seed → generate → review → export path.
+
+## Native contributor setup
+
+Prerequisites: Python 3.11 or newer, [uv](https://docs.astral.sh/uv/), Node.js 20 or newer, and npm.
+
+```bash
+make setup
 uv run dataset-foundry demo
-```
-
-The frontend build creates the assets served at port 8765. The demo initializes the local database,
-imports the versioned customer-support seed set, completes
-a deterministic run, and creates a fine-tuning export. It does not call OpenAI or Anthropic.
-
-Start the workbench:
-
-```bash
 uv run dataset-foundry serve
 ```
 
-Open `http://127.0.0.1:8765`. In a separate terminal, start a continuous worker when creating new
-runs:
+Open `http://127.0.0.1:8765`. Start the durable worker in a second terminal:
 
 ```bash
 uv run dataset-foundry worker
 ```
 
-For frontend development with hot reload, run `npm --prefix frontend run dev` and use the Vite URL;
-the development server proxies `/api` to the local FastAPI service.
+The API and worker remain separate processes so generation never runs inside the HTTP request
+lifecycle. For React hot reload, use `npm --prefix frontend run dev`; Vite proxies `/api` to the API.
 
-## Core workflow
+## Wheel contract
 
-1. Create or open a project.
-2. Import a seed file using one of the supported shapes.
-3. Create a recipe and inspect its privacy/cost preflight.
-4. Generate with `offline` or an explicitly configured live provider.
-5. Review near-threshold and rejected candidates with their reasons.
-6. Export the effective accepted set.
+`make build` refreshes the React assets and then creates the wheel and source archive. The packaged
+wheel contains the workbench under `dataset_foundry/static`, so a wheel install is not API-only.
+Dataset Foundry is not published to PyPI yet; build/install from the repository until a public
+release exists.
 
-## Live providers
+## Use a live provider
 
-Set only the provider credential needed by the server and keep model IDs configurable:
+Copy `.env.example` to `.env`, set exactly the provider key you intend to use, and keep that file out
+of version control. Both the API and worker load the same `.env`; provider credentials remain
+server-side and must never appear in a `VITE_` variable.
 
 ```bash
-OPENAI_API_KEY=... uv run dataset-foundry serve
+uv run dataset-foundry serve
 ```
 
 ```bash
-ANTHROPIC_API_KEY=... uv run dataset-foundry serve
+uv run dataset-foundry worker
 ```
 
-The UI will still require explicit external-data-transfer approval for each live-provider run.
-Provider credentials never belong in recipes, API request bodies, or the browser.
+The workbench still requires explicit external-data-transfer approval for each live-provider recipe.
+Provider credentials are never stored in recipes, sent in API request bodies, or returned to the
+browser. Compose also reads the repository `.env` and passes only those two provider variables to
+the API and worker; the sample bootstrap itself always stays offline.
 
 ## Verify the installation
 
@@ -78,5 +90,5 @@ uv run dataset-foundry doctor
 make check
 ```
 
-`doctor` reports configuration and writable storage status using key-name-only provider readiness;
-it never prints credential values. `make check` runs deterministic backend and frontend validation.
+`doctor` reports configuration and writable storage using key-name-only readiness; it never prints
+credential values. `make check` is deterministic and does not call paid providers.

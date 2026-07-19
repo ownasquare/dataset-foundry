@@ -10,6 +10,13 @@ readme = "README.md"
 requires-python = ">=3.11,<3.15"
 license = { text = "MIT" }
 authors = [{ name = "Fortune Vieyra" }]
+keywords = [
+  "fine-tuning",
+  "synthetic-data",
+  "training-data",
+  "fastapi",
+  "llm",
+]
 classifiers = [
   "Development Status :: 4 - Beta",
   "Framework :: FastAPI",
@@ -52,6 +59,13 @@ dev = [
 
 [project.scripts]
 dataset-foundry = "dataset_foundry.cli:app"
+
+[project.urls]
+Homepage = "https://github.com/ownasquare/dataset-foundry"
+Documentation = "https://github.com/ownasquare/dataset-foundry/tree/main/docs"
+Issues = "https://github.com/ownasquare/dataset-foundry/issues"
+Source = "https://github.com/ownasquare/dataset-foundry"
+Changelog = "https://github.com/ownasquare/dataset-foundry/blob/main/CHANGELOG.md"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/dataset_foundry"]

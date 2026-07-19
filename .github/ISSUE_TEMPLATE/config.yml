@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Setup questions and ideas
+    url: https://github.com/ownasquare/dataset-foundry/discussions
+    about: Use Discussions for help, examples, and open-ended design ideas.
+  - name: Report a vulnerability privately
+    url: https://github.com/ownasquare/dataset-foundry/security/advisories/new
+    about: Never disclose security issues or private data in a public issue.

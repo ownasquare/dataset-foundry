@@ -18,15 +18,24 @@ describe("shared workbench states", () => {
 
   it("renders loading, empty, and recoverable error states", () => {
     const retry = cy.stub().as("retry");
+    const continueFlow = cy.stub().as("continueFlow");
     cy.mount(
       <div style={{ display: "grid", gap: 16, padding: 24 }}>
         <StatePanel kind="loading" />
-        <StatePanel kind="empty" title="No exports yet" message="Create one after review." />
+        <StatePanel
+          kind="empty"
+          title="No exports yet"
+          message="Create one after review."
+          actionLabel="Start generating"
+          onAction={continueFlow}
+        />
         <StatePanel kind="error" onRetry={retry} />
       </div>,
     );
     cy.get('[aria-label="Loading data"]').should("exist");
     cy.contains("No exports yet").should("be.visible");
+    cy.contains("button", "Start generating").click();
+    cy.get("@continueFlow").should("have.been.calledOnce");
     cy.contains("button", "Retry").click();
     cy.get("@retry").should("have.been.calledOnce");
   });

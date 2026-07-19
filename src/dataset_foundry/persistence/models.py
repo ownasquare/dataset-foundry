@@ -173,6 +173,24 @@ class JobRecord(Base):
     error_message: Mapped[str | None] = mapped_column(Text)
 
 
+class WorkerHeartbeatRecord(Base):
+    """Persisted process presence, independent of any individual job lease."""
+
+    __tablename__ = "worker_heartbeats"
+
+    worker_id: Mapped[str] = mapped_column(String(256), primary_key=True)
+    state: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    current_job_id: Mapped[str | None] = mapped_column(String(128))
+    heartbeat_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, index=True
+    )
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, index=True
+    )
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    stopped_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 class CandidateRecord(Base):
     __tablename__ = "candidates"
     __table_args__ = (

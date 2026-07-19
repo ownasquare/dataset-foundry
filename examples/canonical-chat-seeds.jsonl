@@ -1,0 +1,2 @@
+{"id":"chat-1","messages":[{"role":"system","content":"Answer as a careful support specialist."},{"role":"user","content":"How do I replace an expired sign-in link?"},{"role":"assistant","content":"Request a new link and use only the newest email. Escalate if that link also expires immediately."}]}
+{"id":"chat-2","messages":[{"role":"user","content":"Where can I download my latest invoice?"},{"role":"assistant","content":"Open Billing history and choose Download beside the latest invoice."}]}

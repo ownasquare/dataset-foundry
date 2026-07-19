@@ -1,98 +1,103 @@
 # Dataset Foundry
 
-Turn a small seed set into reviewable, fine-tuning-ready data.
+Turn a small seed set into diverse, reviewable, fine-tuning-ready data.
 
-Dataset Foundry is a local-first synthetic data generation pipeline for teams that need more than a
-prompt and a JSON file. It imports representative seed examples, generates bounded candidate
-batches with OpenAI, Anthropic, or a deterministic offline provider, explains every quality
-decision, keeps human review auditable, and writes immutable JSONL and Parquet exports.
+Dataset Foundry is a local-first workbench for generating structured examples with an offline
+provider, OpenAI, or Anthropic; filtering them with explainable quality and similarity checks; and
+exporting immutable JSONL or Parquet datasets.
 
 ![Dataset Foundry workbench](docs/assets/dataset-foundry-overview.png)
 
-## What it solves
+## Try the complete product
 
-- **Structured generation:** native Pydantic structured output for both live provider adapters.
-- **Scale without runaway work:** target, candidate, call, concurrency, retry, and token preflight.
-- **Diversity with evidence:** vector nearest-match filtering against seeds and accepted candidates.
-- **Reviewable quality:** component scores, reason codes, nearest matches, and preserved overrides.
-- **Fine-tuning delivery:** canonical, OpenAI chat, Alpaca, and grouped Parquet splits with hashes.
-- **Key-free evaluation:** the full workflow runs offline and deterministically for demos and CI.
-
-## Quick start
+With Docker running:
 
 ```bash
-uv sync --frozen
-npm --prefix frontend ci
-npm --prefix frontend run build
+git clone https://github.com/ownasquare/dataset-foundry.git
+cd dataset-foundry
+make quickstart
+```
+
+Open [http://127.0.0.1:8765](http://127.0.0.1:8765). That one command builds the app, starts the API
+and worker, and idempotently prepares a network-free sample project. No API key is needed.
+
+```bash
+make stop        # stop the app and keep its data
+make reset-demo  # stop the app and delete its local Docker data
+```
+
+No `make` command? Run `docker compose up --build --wait` instead. See
+[Getting started](docs/getting-started.md) for native development and live-provider setup.
+
+## Your first useful result
+
+The quickstart opens with **Customer Support Demo**, 25 accepted examples, and one ready export
+package containing canonical JSONL, OpenAI chat JSONL, Alpaca JSONL, and Parquet artifacts.
+
+1. Open **Review**, choose **Accepted**, and inspect one example with its source and quality evidence.
+2. Open **Exports** and download the canonical JSONL, OpenAI chat JSONL, Alpaca JSONL, or Parquet file.
+3. Open **Generate** when you are ready to import your own seed file and create another bounded run.
+
+The included [`customer-support-seeds.jsonl`](examples/customer-support-seeds.jsonl) is a safe file
+to use for a second walkthrough.
+
+## The core workflow
+
+| Stage | What you do | What Dataset Foundry protects |
+|---|---|---|
+| Import | Add representative JSONL, JSON, CSV, or Parquet seeds | Schema, upload, row, duplicate, and fingerprint checks |
+| Generate | Pick a provider, target, and quality bounds | Cost/candidate preflight, explicit data-transfer consent, durable jobs |
+| Review | Inspect accepted, borderline, and rejected examples | Source lineage, reason codes, similarity, preserved human overrides |
+| Export | Choose a fine-tuning format and data split | Lineage-grouped splits, dataset card, manifest, byte counts, SHA-256 |
+
+Operational views such as Projects, Runs, and Settings stay under **More** so the main workflow stays
+focused. Technical thresholds use focusable information controls, while cost, privacy, and errors
+remain visible.
+
+## Provider modes
+
+| Provider | Best for | Network | Structured output |
+|---|---|---:|---|
+| `offline` | evaluation, CI, air-gapped work, and repeatable baselines | No | Local Pydantic objects |
+| `openai` | live synthetic generation | Yes | Responses API with Pydantic parsing |
+| `anthropic` | live synthetic generation | Yes | Messages API with Pydantic parsing |
+
+Live runs require a server-side credential plus explicit external-data-transfer approval. Dataset
+Foundry never silently replaces a selected paid provider with offline output.
+
+## Install from source
+
+The Docker quickstart is the supported first-run path. Contributors can run the processes directly:
+
+```bash
+make setup
 uv run dataset-foundry demo
 uv run dataset-foundry serve
 ```
 
-Open [http://127.0.0.1:8765](http://127.0.0.1:8765). Start `uv run dataset-foundry worker` in a
-second terminal when you want queued runs to continue processing.
+Run `uv run dataset-foundry worker` in a second terminal. The built wheel includes the React
+workbench; `make build` refreshes the packaged UI before creating the wheel and source archive.
 
-The demo provider makes no network calls and requires no API key. See the
-[getting-started guide](docs/getting-started.md) for live-provider and frontend-development setup.
+## Extend it
 
-## The workflow
+| Extension | Start here | Registration or injection point |
+|---|---|---|
+| Generation provider | `src/dataset_foundry/providers/base.py` | `providers/registry.py` |
+| Quality scorer | `src/dataset_foundry/quality/scorers.py` | `Container(quality_pipeline_factory=...)` |
+| Embedder | `src/dataset_foundry/quality/embeddings.py` | same worker-facing pipeline factory |
+| Input shape | `src/dataset_foundry/ingestion/mapping.py` | ingestion loader mapping |
+| Export format | `src/dataset_foundry/exports/formats.py` | export service + manifest |
+| Workbench view | `frontend/src/features/` | `frontend/src/App.tsx` |
 
-```mermaid
-flowchart LR
-    A["Import seeds"] --> B["Configure recipe"]
-    B --> C["Privacy and cost preflight"]
-    C --> D["Generate candidates"]
-    D --> E["Quality and similarity gates"]
-    E --> F["Review exceptions"]
-    F --> G["Export fine-tuning set"]
-```
+[Extending Dataset Foundry](docs/extending.md) contains copyable scorer code, exact file paths, and
+focused validation commands. [Contributing](CONTRIBUTING.md) explains the 10-minute contributor path.
 
-The workbench is deliberately organized like a data operations product—Projects, Generate, Runs,
-Review, and Exports. Provider traces, prompt hashes, embedding fingerprints, and component evidence
-stay available under Details without becoming the default navigation model.
+## Good fit / not yet
 
-## Provider modes
-
-| Provider | Intended use | Network | Structured output |
-|---|---|---:|---|
-| `offline` | demos, CI, scale and air-gapped evaluation | No | Pydantic objects produced locally |
-| `openai` | live synthetic generation | Yes | Responses API with Pydantic parsing |
-| `anthropic` | live synthetic generation | Yes | Messages API with Pydantic parsing |
-
-Live runs require a server-side credential and an explicit external-data-transfer confirmation.
-Dataset Foundry never silently replaces a paid provider with offline output.
-
-## Quality and diversity
-
-Every candidate passes canonical message validation, exact-duplicate normalization, vector
-nearest-match checks, and explainable components covering completeness, useful length, relevance,
-lexical richness, boilerplate, seed novelty, accepted-pool diversity, and configured constraints.
-
-The built-in `lexical-hash-v1` embedder produces real normalized vectors without downloading a
-model. It is clearly labeled lexical rather than semantic. Embedding fingerprints prevent vectors
-from different models or dimensions from being compared.
-
-Read [quality methodology](docs/quality-methodology.md) for the decision and split-leakage contract.
-
-## Exports
-
-Completed runs can produce:
-
-- canonical chat JSONL;
-- OpenAI chat fine-tuning JSONL;
-- Alpaca-style instruction/input/output JSONL; and
-- train/validation/test Parquet shards.
-
-Related examples are grouped by root seed before splitting. Each export includes a dataset card and
-manifest with thresholds, provenance, actual split counts, byte sizes, and SHA-256 hashes.
-
-## Architecture
-
-FastAPI is the only product data boundary. A separate SQLite-leased worker generates and scores
-candidates outside the HTTP lifecycle; the React workbench and CLI consume the same API. SQLite is
-the local transactional source of truth, and exports are staged then atomically promoted beneath
-`.data/artifacts/`.
-
-See [architecture](docs/architecture.md) and the [API reference](docs/api.md).
+Dataset Foundry is a good fit for local data teams, portfolio evaluation, offline baselines, and
+single-host generation jobs. It is intentionally not yet a distributed multi-tenant service: the
+default database is SQLite, one worker is recommended, and hosted authentication/object storage are
+deployment-specific work.
 
 ## Validation
 
@@ -102,13 +107,8 @@ make benchmark-ci
 make e2e
 ```
 
-- Pytest owns Python unit, integration, contract, and scale tests.
-- Cypress owns React component tests only.
-- Playwright owns all end-to-end tests.
-- Live-provider smoke tests are separately opted in and never part of an offline-green claim.
-
-The current local, mocked-provider, browser, live-provider, and hosted proof boundaries are recorded
-in [the build completion record](docs/dataset-foundry/2026-07-18-build-completion.md).
+Pytest owns Python tests, Cypress owns React component tests only, and Playwright owns all E2E tests.
+Live-provider, local-browser, container, package, hosted, and deployed proof remain separate claims.
 
 ## Documentation
 
@@ -121,6 +121,8 @@ in [the build completion record](docs/dataset-foundry/2026-07-18-build-completio
 - [Security model](docs/security.md)
 - [Extending Dataset Foundry](docs/extending.md)
 - [Troubleshooting](docs/troubleshooting.md)
+- [Support](SUPPORT.md)
+- [Changelog](CHANGELOG.md)
 
 ## License
 

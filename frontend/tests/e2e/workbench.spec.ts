@@ -23,7 +23,13 @@ test("completes the primary generation setup flow", async ({ page }) => {
 });
 
 test("opens every workbench view, provenance details, and both themes", async ({ page }) => {
-  for (const view of ["Projects", "Generate", "Runs"]) {
+  for (const view of ["Generate", "Review", "Exports"]) {
+    await page.getByRole("button", { name: view, exact: true }).click();
+    await expect(page.locator("h1")).not.toBeEmpty();
+  }
+
+  await page.getByRole("button", { name: "More", exact: true }).click();
+  for (const view of ["Projects", "Runs"]) {
     await page.getByRole("button", { name: view, exact: true }).click();
     await expect(page.locator("h1")).not.toBeEmpty();
   }
@@ -31,16 +37,26 @@ test("opens every workbench view, provenance details, and both themes", async ({
   await page.getByText("Recipe and provenance", { exact: true }).click();
   await expect(page.getByText("Run reference", { exact: true })).toBeVisible();
 
-  for (const view of ["Review", "Exports", "Settings"]) {
-    await page.getByRole("button", { name: view, exact: true }).click();
-    await expect(page.locator("h1")).not.toBeEmpty();
-  }
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await expect(page.locator("h1")).not.toBeEmpty();
   await expect(page.getByText("Provider secrets are never sent to the browser.")).toBeVisible();
 
   await page.getByRole("radio", { name: "Light Light surfaces" }).click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
   await page.getByRole("radio", { name: "Dark Dark surfaces" }).click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+});
+
+test("keeps supporting navigation out of the core path and exposes concise help", async ({ page }) => {
+  await expect(page.getByRole("button", { name: "Generate", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Projects", exact: true })).toBeHidden();
+
+  await page.getByRole("button", { name: "Generate", exact: true }).click();
+  await page.getByText("Quality and candidate limits", { exact: true }).click();
+  await page.locator('summary[aria-label="About minimum quality"]').click();
+  await expect(
+    page.getByText("Examples scoring below this value are not automatically accepted."),
+  ).toBeVisible();
 });
 
 test("records a review decision and creates a downloadable export", async ({ page }) => {
@@ -64,6 +80,14 @@ test("records a review decision and creates a downloadable export", async ({ pag
   await expect(download).toHaveAttribute("href", /\/api\/v1\/exports\/export-\d+\/download/);
 });
 
+test("cancels an active generation without leaving the core workbench", async ({ page }) => {
+  await page.getByRole("button", { name: "More", exact: true }).click();
+  await page.getByRole("button", { name: "Runs", exact: true }).click();
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByRole("button", { name: "Cancel run", exact: true }).click();
+  await expect(page.getByText("Run cancelled", { exact: true })).toBeVisible();
+});
+
 test("fits desktop, tablet, and mobile without horizontal overflow", async ({ page }) => {
   for (const viewport of [
     { width: 1440, height: 900 },
@@ -79,4 +103,21 @@ test("fits desktop, tablet, and mobile without horizontal overflow", async ({ pa
     }));
     expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth + 1);
   }
+});
+
+test("mobile drawer stays hidden until opened and keeps the destination title visible", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const sidebar = page.getByRole("complementary", { name: "Primary navigation" });
+  await expect(sidebar).toBeHidden();
+
+  await page.getByRole("button", { name: "Open navigation" }).click();
+  await expect(sidebar).toBeVisible();
+  await sidebar.getByRole("button", { name: "Review", exact: true }).click();
+
+  const heading = page.getByRole("heading", { name: "Review candidates" });
+  await expect(heading).toBeVisible();
+  const position = await heading.boundingBox();
+  expect(position?.y ?? 0).toBeGreaterThanOrEqual(58);
+  expect(await page.evaluate(() => window.scrollY)).toBe(0);
+  await expect(sidebar).toBeHidden();
 });

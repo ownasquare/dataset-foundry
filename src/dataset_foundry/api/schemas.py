@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Generic, Self, TypeVar
+from typing import Generic, Literal, Self, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -106,6 +106,7 @@ class PreflightRequest(ApiModel):
 
 class PreflightView(ApiModel):
     ready: bool
+    worker_ready: bool
     provider: ProviderName
     model: str
     seed_count: int
@@ -115,6 +116,16 @@ class PreflightView(ApiModel):
     estimated_tokens: int
     external_data_transfer_required: bool
     blockers: list[str]
+
+
+class SystemStatusView(ApiModel):
+    api_ready: bool = True
+    worker_ready: bool
+    worker_state: Literal["idle", "busy", "stale", "stopped", "missing"]
+    worker_id: str | None = None
+    current_job_id: str | None = None
+    heartbeat_at: datetime | None = None
+    expires_at: datetime | None = None
 
 
 class RunCreate(ApiModel):

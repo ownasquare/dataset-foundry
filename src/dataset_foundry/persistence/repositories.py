@@ -45,6 +45,7 @@ from dataset_foundry.persistence.models import (
     ReviewRecord,
     RunRecord,
     SeedExampleRecord,
+    WorkerHeartbeatRecord,
 )
 
 
@@ -54,6 +55,18 @@ class RecordNotFoundError(LookupError):
 
 class LeaseLostError(RuntimeError):
     """Raised when a worker mutates a job without current lease ownership."""
+
+
+@dataclass(frozen=True, slots=True)
+class WorkerPresenceStatus:
+    """Current worker availability derived from persisted heartbeat expiry."""
+
+    ready: bool
+    state: str
+    worker_id: str | None = None
+    current_job_id: str | None = None
+    heartbeat_at: datetime | None = None
+    expires_at: datetime | None = None
 
 
 def _messages_payload(messages: list[ChatMessage]) -> list[dict[str, str]]:
@@ -578,6 +591,123 @@ class JobRepository:
             return result.rowcount if isinstance(result, CursorResult) else 0
 
 
+class WorkerHeartbeatRepository:
+    """Store process-level worker presence so idle workers remain observable."""
+
+    _ACTIVE_STATES = frozenset({"idle", "busy"})
+
+    def __init__(self, session_factory: SessionFactory) -> None:
+        self.session_factory = session_factory
+
+    def heartbeat(
+        self,
+        worker_id: str,
+        *,
+        state: str,
+        ttl_seconds: float,
+        current_job_id: str | None = None,
+        now: datetime | None = None,
+    ) -> WorkerHeartbeatRecord:
+        worker_id = worker_id.strip()
+        if not worker_id:
+            raise ValueError("worker_id must not be blank")
+        if state not in self._ACTIVE_STATES:
+            raise ValueError("worker heartbeat state must be idle or busy")
+        if ttl_seconds <= 0:
+            raise ValueError("worker heartbeat ttl_seconds must be positive")
+        if state == "idle" and current_job_id is not None:
+            raise ValueError("idle workers cannot reference a current job")
+        timestamp = now or datetime.now(UTC)
+        expires_at = timestamp + timedelta(seconds=ttl_seconds)
+        with session_scope(self.session_factory) as session:
+            record = session.get(WorkerHeartbeatRecord, worker_id)
+            if record is None:
+                record = WorkerHeartbeatRecord(
+                    worker_id=worker_id,
+                    state=state,
+                    current_job_id=current_job_id,
+                    heartbeat_at=timestamp,
+                    expires_at=expires_at,
+                    started_at=timestamp,
+                )
+                session.add(record)
+            else:
+                if record.state == "stopped":
+                    record.started_at = timestamp
+                record.state = state
+                record.current_job_id = current_job_id
+                record.heartbeat_at = timestamp
+                record.expires_at = expires_at
+                record.stopped_at = None
+            session.flush()
+            return record
+
+    def stop(
+        self,
+        worker_id: str,
+        *,
+        now: datetime | None = None,
+    ) -> WorkerHeartbeatRecord:
+        timestamp = now or datetime.now(UTC)
+        with session_scope(self.session_factory) as session:
+            record = session.get(WorkerHeartbeatRecord, worker_id)
+            if record is None:
+                raise RecordNotFoundError(f"worker {worker_id} was not found")
+            record.state = "stopped"
+            record.current_job_id = None
+            record.heartbeat_at = timestamp
+            record.expires_at = timestamp
+            record.stopped_at = timestamp
+            session.flush()
+            return record
+
+    def status(self, *, now: datetime | None = None) -> WorkerPresenceStatus:
+        timestamp = now or datetime.now(UTC)
+        with session_scope(self.session_factory) as session:
+            active = session.scalar(
+                select(WorkerHeartbeatRecord)
+                .where(
+                    WorkerHeartbeatRecord.state.in_(self._ACTIVE_STATES),
+                    WorkerHeartbeatRecord.expires_at > timestamp,
+                )
+                .order_by(
+                    WorkerHeartbeatRecord.heartbeat_at.desc(),
+                    WorkerHeartbeatRecord.worker_id,
+                )
+                .limit(1)
+            )
+            if active is not None:
+                return self._status_from_record(active, ready=True, state=active.state)
+            latest = session.scalar(
+                select(WorkerHeartbeatRecord)
+                .order_by(
+                    WorkerHeartbeatRecord.heartbeat_at.desc(),
+                    WorkerHeartbeatRecord.worker_id,
+                )
+                .limit(1)
+            )
+            if latest is None:
+                return WorkerPresenceStatus(ready=False, state="missing")
+            state = "stopped" if latest.state == "stopped" else "stale"
+            return self._status_from_record(latest, ready=False, state=state)
+
+    @staticmethod
+    def _status_from_record(
+        record: WorkerHeartbeatRecord,
+        *,
+        ready: bool,
+        state: str,
+    ) -> WorkerPresenceStatus:
+        return WorkerPresenceStatus(
+            ready=ready,
+            state=state,
+            worker_id=record.worker_id,
+            current_job_id=record.current_job_id,
+            heartbeat_at=record.heartbeat_at,
+            expires_at=record.expires_at,
+        )
+
+
 class CandidateRepository:
     def __init__(self, session_factory: SessionFactory) -> None:
         self.session_factory = session_factory
@@ -905,6 +1035,7 @@ class Repositories:
         self.recipes = RecipeRepository(session_factory)
         self.runs = RunRepository(session_factory)
         self.jobs = JobRepository(session_factory)
+        self.workers = WorkerHeartbeatRepository(session_factory)
         self.candidates = CandidateRepository(session_factory)
         self.reviews = ReviewRepository(session_factory)
         self.exports = ExportRepository(session_factory)

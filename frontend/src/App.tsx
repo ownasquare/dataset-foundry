@@ -49,16 +49,27 @@ export function App({ api, demoMode = false, initialView = "overview" }: AppProp
       view = <ProjectsView onGenerate={openGenerate} />;
       break;
     case "generate":
-      view = <GenerateView initialProjectId={selectedProjectId} onOpenRuns={() => setActiveView("runs")} />;
+      view = (
+        <GenerateView
+          initialProjectId={selectedProjectId}
+          onCreateProject={() => setActiveView("projects")}
+          onOpenRuns={() => setActiveView("runs")}
+        />
+      );
       break;
     case "runs":
-      view = <RunsView onReview={() => setActiveView("review")} />;
+      view = (
+        <RunsView
+          onGenerate={() => setActiveView("generate")}
+          onReview={() => setActiveView("review")}
+        />
+      );
       break;
     case "review":
-      view = <ReviewView />;
+      view = <ReviewView onGenerate={() => setActiveView("generate")} />;
       break;
     case "exports":
-      view = <ExportsView />;
+      view = <ExportsView onGenerate={() => setActiveView("generate")} />;
       break;
     case "settings":
       view = <SettingsView demoMode={demoMode} />;

@@ -21,7 +21,7 @@ from dataset_foundry.quality.embeddings import (
     LexicalHashEmbedder,
     normalize_text,
 )
-from dataset_foundry.quality.scorers import ExplainableScorer, candidate_text
+from dataset_foundry.quality.scorers import CandidateScorer, ExplainableScorer, candidate_text
 from dataset_foundry.quality.similarity import (
     IncompatibleEmbeddingError,
     SimilarityMatch,
@@ -86,6 +86,7 @@ class QualityPipeline:
         self,
         *,
         embedder: EmbeddingProvider | None = None,
+        scorer: CandidateScorer | None = None,
         quality_threshold: float = 0.72,
         similarity_threshold: float = 0.92,
         review_margin: float = 0.05,
@@ -100,7 +101,7 @@ class QualityPipeline:
         self.quality_threshold = quality_threshold
         self.similarity_threshold = similarity_threshold
         self.review_margin = review_margin
-        self.scorer = ExplainableScorer()
+        self.scorer = scorer or ExplainableScorer()
 
     def _build_report(
         self,

@@ -107,6 +107,8 @@ export function ProjectsView({ onGenerate }: ProjectsViewProps) {
           kind="empty"
           title="Create your first project"
           message="A project groups the seeds, recipes, runs, review decisions, and exports for one use case."
+          actionLabel="New project"
+          onAction={() => setShowForm(true)}
         />
       ) : null}
 

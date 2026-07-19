@@ -1,13 +1,22 @@
-import { AlertTriangle, Inbox, RefreshCw } from "lucide-react";
+import { AlertTriangle, ArrowRight, Inbox, RefreshCw } from "lucide-react";
 
 interface StatePanelProps {
   kind: "loading" | "empty" | "error";
   title?: string;
   message?: string;
   onRetry?: () => void;
+  actionLabel?: string;
+  onAction?: () => void;
 }
 
-export function StatePanel({ kind, title, message, onRetry }: StatePanelProps) {
+export function StatePanel({
+  kind,
+  title,
+  message,
+  onRetry,
+  actionLabel,
+  onAction,
+}: StatePanelProps) {
   if (kind === "loading") {
     return (
       <div className="state-panel state-panel--loading" aria-busy="true" aria-label="Loading data">
@@ -37,6 +46,11 @@ export function StatePanel({ kind, title, message, onRetry }: StatePanelProps) {
       {onRetry ? (
         <button className="button button--secondary" type="button" onClick={onRetry}>
           <RefreshCw size={16} aria-hidden="true" /> Retry
+        </button>
+      ) : null}
+      {actionLabel && onAction ? (
+        <button className="button button--primary" type="button" onClick={onAction}>
+          {actionLabel} <ArrowRight size={16} aria-hidden="true" />
         </button>
       ) : null}
     </div>

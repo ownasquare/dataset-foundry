@@ -19,6 +19,8 @@ export default defineConfig({
     port: 4173,
   },
   build: {
-    sourcemap: true,
+    outDir: "../src/dataset_foundry/static",
+    emptyOutDir: true,
+    sourcemap: false,
   },
 });

@@ -29,7 +29,7 @@ COPY src/ ./src/
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev
 
-COPY --from=frontend-builder /build/frontend/dist ./frontend/dist
+COPY --from=frontend-builder /build/src/dataset_foundry/static ./src/dataset_foundry/static
 COPY examples/ ./examples/
 COPY scripts/ ./scripts/
 
@@ -45,8 +45,7 @@ ENV DATASET_FOUNDRY_HOST=0.0.0.0 \
     DATASET_FOUNDRY_PORT=8765 \
     DATASET_FOUNDRY_DATA_DIR=/data \
     DATASET_FOUNDRY_DATABASE_URL=sqlite:////data/dataset-foundry.db \
-    DATASET_FOUNDRY_ARTIFACT_DIR=/data/artifacts \
-    DATASET_FOUNDRY_FRONTEND_DIST=/app/frontend/dist
+    DATASET_FOUNDRY_ARTIFACT_DIR=/data/artifacts
 
 HEALTHCHECK --interval=15s --timeout=3s --start-period=10s --retries=5 \
   CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8765/health', timeout=2)"]

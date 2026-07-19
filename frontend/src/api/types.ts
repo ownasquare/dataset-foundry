@@ -130,6 +130,12 @@ export interface ProviderStatus {
   dataLeavesEnvironment: boolean;
 }
 
+export interface SystemStatus {
+  apiReady: boolean;
+  workerReady: boolean;
+  workerState: "idle" | "busy" | "stale" | "stopped" | "missing";
+}
+
 export interface SeedUploadResult {
   datasetId: string;
   filename: string;
@@ -191,6 +197,7 @@ export interface CreateExportInput {
 }
 
 export interface DatasetFoundryApi {
+  getSystemStatus(signal?: AbortSignal): Promise<SystemStatus>;
   getOverview(signal?: AbortSignal): Promise<OverviewData>;
   listProjects(signal?: AbortSignal): Promise<Project[]>;
   createProject(input: CreateProjectInput): Promise<Project>;
@@ -198,6 +205,7 @@ export interface DatasetFoundryApi {
   preflight(input: PreflightRequest): Promise<PreflightResult>;
   listRuns(signal?: AbortSignal): Promise<Run[]>;
   createRun(input: CreateRunInput): Promise<Run>;
+  cancelRun(runId: string): Promise<Run>;
   listCandidates(
     runId: string,
     decision: CandidateDecision | "all",

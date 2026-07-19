@@ -9,7 +9,11 @@ from uuid import uuid4
 from dataset_foundry.config import Settings, get_settings
 from dataset_foundry.domain import CandidateDecision, ExportFormat, RunStatus
 from dataset_foundry.exports import ExportService
-from dataset_foundry.generation.service import GenerationService, candidate_from_record
+from dataset_foundry.generation.service import (
+    GenerationService,
+    QualityPipelineFactory,
+    candidate_from_record,
+)
 from dataset_foundry.jobs import Worker
 from dataset_foundry.persistence import Database, Repositories
 from dataset_foundry.persistence.models import ExportRecord
@@ -19,14 +23,23 @@ from dataset_foundry.providers import ProviderRegistry
 class Container:
     """Own database, repositories, providers, and application services."""
 
-    def __init__(self, settings: Settings | None = None) -> None:
+    def __init__(
+        self,
+        settings: Settings | None = None,
+        *,
+        quality_pipeline_factory: QualityPipelineFactory | None = None,
+    ) -> None:
         self.settings = settings or get_settings()
         self.settings.data_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
         self.database = Database(self.settings.resolved_database_url)
         self.database.initialize()
         self.repositories = Repositories(self.database.session_factory)
         self.providers = ProviderRegistry(self.settings)
-        self.generation = GenerationService(self.repositories, self.providers)
+        self.generation = GenerationService(
+            self.repositories,
+            self.providers,
+            quality_pipeline_factory=quality_pipeline_factory,
+        )
         self.exports = ExportService(self.settings.resolved_artifacts_dir)
 
     def worker(self, *, worker_id: str | None = None) -> Worker:

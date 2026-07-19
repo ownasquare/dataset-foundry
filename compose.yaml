@@ -20,15 +20,27 @@ x-runtime: &runtime
     DATASET_FOUNDRY_DEFAULT_PROVIDER: offline
     DATASET_FOUNDRY_HOST: 0.0.0.0
     DATASET_FOUNDRY_PORT: "8765"
+    OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
+    ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
   security_opt:
     - no-new-privileges:true
   cap_drop:
     - ALL
 
 services:
+  bootstrap:
+    <<: *runtime
+    command: ["demo"]
+    restart: "no"
+    healthcheck:
+      disable: true
+
   api:
     <<: *runtime
     command: ["serve"]
+    depends_on:
+      bootstrap:
+        condition: service_completed_successfully
     ports:
       - "127.0.0.1:8765:8765"
     healthcheck:

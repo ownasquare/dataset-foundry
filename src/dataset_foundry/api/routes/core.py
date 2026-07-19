@@ -33,6 +33,7 @@ from dataset_foundry.api.schemas import (
     RunCounts,
     RunCreate,
     RunView,
+    SystemStatusView,
 )
 from dataset_foundry.container import Container
 from dataset_foundry.domain import (
@@ -297,6 +298,19 @@ def overview(request: Request) -> OverviewView:
     )
 
 
+@router.get("/system/status", response_model=SystemStatusView)
+def system_status(request: Request) -> SystemStatusView:
+    status = _container(request).repositories.workers.status()
+    return SystemStatusView(
+        worker_ready=status.ready,
+        worker_state=status.state,
+        worker_id=status.worker_id,
+        current_job_id=status.current_job_id,
+        heartbeat_at=status.heartbeat_at,
+        expires_at=status.expires_at,
+    )
+
+
 @router.post("/projects", status_code=201, response_model=ProjectView)
 def create_project(payload: ProjectCreate, request: Request) -> ProjectView:
     container = _container(request)
@@ -468,7 +482,13 @@ def preflight(recipe_id: str, payload: PreflightRequest, request: Request) -> Pr
         seeds,
         provider_configured=container.settings.provider_configured(recipe.provider.value),
     )
-    return PreflightView.model_validate({**result.model_dump(), "seed_count": len(seeds)})
+    return PreflightView.model_validate(
+        {
+            **result.model_dump(),
+            "seed_count": len(seeds),
+            "worker_ready": container.repositories.workers.status().ready,
+        }
+    )
 
 
 @router.post("/runs", status_code=202, response_model=RunView)

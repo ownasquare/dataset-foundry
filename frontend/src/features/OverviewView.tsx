@@ -34,6 +34,36 @@ export function OverviewView({ onNavigate }: { onNavigate: (view: ViewKey) => vo
   const data = overview.data;
   const qualityTotal = data.qualitySegments.reduce((sum, segment) => sum + segment.count, 0);
 
+  if (data.projectCount === 0) {
+    return (
+      <div className="view-stack">
+        <PageHeader
+          eyebrow="Workspace overview"
+          title="Turn seed examples into training-ready data"
+          description="Start offline, inspect every quality decision, and export a dataset you can defend."
+        />
+        <section className="panel first-success" aria-labelledby="first-success-title">
+          <div>
+            <p className="eyebrow">Five-minute start</p>
+            <h2 id="first-success-title">Create your first dataset</h2>
+            <p>One project, one representative seed file, and the offline provider are enough.</p>
+          </div>
+          <ol>
+            <li><span>1</span><div><strong>Create a project</strong><small>Name the behavior you want to train.</small></div></li>
+            <li><span>2</span><div><strong>Import seeds</strong><small>Upload a small JSONL, CSV, JSON, or Parquet file.</small></div></li>
+            <li><span>3</span><div><strong>Generate offline</strong><small>Review the plan, then create and export examples.</small></div></li>
+          </ol>
+          <div className="first-success__action">
+            <button className="button button--primary" type="button" onClick={() => onNavigate("projects")}>
+              Create a project <ArrowRight size={16} aria-hidden="true" />
+            </button>
+            <span>No API key or paid provider is required.</span>
+          </div>
+        </section>
+      </div>
+    );
+  }
+
   return (
     <div className="view-stack">
       <PageHeader
@@ -69,7 +99,7 @@ export function OverviewView({ onNavigate }: { onNavigate: (view: ViewKey) => vo
         <MetricCard
           label="Projects"
           value={formatCount(data.projectCount)}
-          detail={`${formatCount(data.datasetCount)} seed datasets`}
+          detail={`${formatCount(data.datasetCount)} ${data.datasetCount === 1 ? "seed dataset" : "seed datasets"}`}
           icon={Layers3}
         />
         <MetricCard
@@ -114,13 +144,13 @@ export function OverviewView({ onNavigate }: { onNavigate: (view: ViewKey) => vo
                   <span>{data.activeRun.projectName}</span>
                 </div>
                 <span>
-                  {formatCount(data.activeRun.generatedCount)} / {formatCount(data.activeRun.targetCount)}
+                  {formatCount(data.activeRun.acceptedCount)} / {formatCount(data.activeRun.targetCount)} accepted
                 </span>
               </div>
               <ProgressBar
-                value={data.activeRun.generatedCount}
+                value={data.activeRun.acceptedCount}
                 max={data.activeRun.targetCount}
-                label="Generation progress"
+                label="Accepted target progress"
               />
               <div className="three-stat-row">
                 <div>
@@ -183,7 +213,9 @@ export function OverviewView({ onNavigate }: { onNavigate: (view: ViewKey) => vo
           <div className="export-ready-note">
             <FileArchive size={18} aria-hidden="true" />
             <div>
-              <strong>{formatCount(data.readyExports)} exports ready</strong>
+              <strong>
+                {formatCount(data.readyExports)} {data.readyExports === 1 ? "export" : "exports"} ready
+              </strong>
               <span>Immutable artifacts with manifests and hashes</span>
             </div>
           </div>

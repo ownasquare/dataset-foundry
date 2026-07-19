@@ -6,6 +6,7 @@ import {
   FolderKanban,
   Menu,
   MoonStar,
+  MoreHorizontal,
   PlaySquare,
   Settings,
   Sparkles,
@@ -14,6 +15,7 @@ import {
 } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
+import { useSystemStatus } from "../api/queries";
 import type { ViewKey } from "../api/types";
 import { useTheme } from "./ThemeProvider";
 
@@ -24,34 +26,42 @@ interface AppShellProps {
   demoMode: boolean;
 }
 
-const NAVIGATION = [
-  { id: "overview", label: "Overview", icon: BarChart3, group: "Workspace" },
-  { id: "projects", label: "Projects", icon: FolderKanban, group: "Workspace" },
-  { id: "generate", label: "Generate", icon: Sparkles, group: "Create" },
-  { id: "runs", label: "Runs", icon: PlaySquare, group: "Create" },
-  { id: "review", label: "Review", icon: FileCheck2, group: "Prepare" },
-  { id: "exports", label: "Exports", icon: Archive, group: "Prepare" },
-  { id: "settings", label: "Settings", icon: Settings, group: "System" },
+const PRIMARY_NAVIGATION = [
+  { id: "overview", label: "Overview", icon: BarChart3 },
+  { id: "generate", label: "Generate", icon: Sparkles },
+  { id: "review", label: "Review", icon: FileCheck2 },
+  { id: "exports", label: "Exports", icon: Archive },
+] as const;
+
+const SECONDARY_NAVIGATION = [
+  { id: "projects", label: "Projects", icon: FolderKanban },
+  { id: "runs", label: "Runs", icon: PlaySquare },
+  { id: "settings", label: "Settings", icon: Settings },
 ] as const;
 
 export function AppShell({ activeView, onNavigate, children, demoMode }: AppShellProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const { theme, setTheme } = useTheme();
+  const systemStatus = useSystemStatus();
+  const serviceWarning = systemStatus.isError || systemStatus.data?.workerReady === false;
 
   const navigate = (view: ViewKey) => {
     onNavigate(view);
     setMobileOpen(false);
-    window.requestAnimationFrame(() => document.querySelector<HTMLElement>("#main-content")?.focus());
+    if (!SECONDARY_NAVIGATION.some((item) => item.id === view)) setMoreOpen(false);
+    window.requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, behavior: "auto" });
+      document.querySelector<HTMLElement>("#main-content")?.focus({ preventScroll: true });
+    });
   };
 
   const cycleTheme = () => {
     setTheme(theme === "light" ? "dark" : theme === "dark" ? "system" : "light");
   };
 
-  const grouped = NAVIGATION.reduce<Record<string, typeof NAVIGATION[number][]>>((groups, item) => {
-    (groups[item.group] ??= []).push(item);
-    return groups;
-  }, {});
+  const secondaryActive = SECONDARY_NAVIGATION.some((item) => item.id === activeView);
+  const showSecondary = moreOpen || secondaryActive;
 
   return (
     <div className="app-shell">
@@ -81,10 +91,18 @@ export function AppShell({ activeView, onNavigate, children, demoMode }: AppShel
           <span className="brand-mark" aria-hidden="true">
             <DatabaseZap size={22} />
           </span>
-          <span>
+          <span className="brand-lockup__copy">
             <strong>Dataset Foundry</strong>
             <small>Training data workbench</small>
           </span>
+          <button
+            className="icon-button sidebar-close"
+            type="button"
+            aria-label="Close navigation"
+            onClick={() => setMobileOpen(false)}
+          >
+            <X size={19} />
+          </button>
         </div>
 
         <button className="button button--primary sidebar-cta" type="button" onClick={() => navigate("generate")}>
@@ -92,13 +110,38 @@ export function AppShell({ activeView, onNavigate, children, demoMode }: AppShel
         </button>
 
         <nav className="sidebar-nav">
-          {Object.entries(grouped).map(([group, items]) => (
-            <section key={group} aria-labelledby={`nav-${group.toLowerCase()}`}>
-              <p id={`nav-${group.toLowerCase()}`} className="sidebar-nav__group">
-                {group}
-              </p>
-              <ul>
-                {items.map(({ id, label, icon: Icon }) => (
+          <section aria-labelledby="nav-core-workflow">
+            <p id="nav-core-workflow" className="sidebar-nav__group">Core workflow</p>
+            <ul>
+              {PRIMARY_NAVIGATION.map(({ id, label, icon: Icon }) => (
+                <li key={id}>
+                  <button
+                    className={activeView === id ? "is-active" : undefined}
+                    type="button"
+                    aria-current={activeView === id ? "page" : undefined}
+                    onClick={() => navigate(id)}
+                  >
+                    <Icon size={17} aria-hidden="true" />
+                    <span>{label}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+          <section aria-labelledby="nav-supporting-tools">
+            <p id="nav-supporting-tools" className="sidebar-nav__group">Supporting tools</p>
+            <button
+              className={`secondary-nav-toggle${secondaryActive ? " is-active" : ""}`}
+              type="button"
+              aria-expanded={showSecondary}
+              onClick={() => setMoreOpen((open) => !open)}
+            >
+              <MoreHorizontal size={17} aria-hidden="true" />
+              <span>More</span>
+            </button>
+            {showSecondary ? (
+              <ul className="secondary-nav-list">
+                {SECONDARY_NAVIGATION.map(({ id, label, icon: Icon }) => (
                   <li key={id}>
                     <button
                       className={activeView === id ? "is-active" : undefined}
@@ -112,20 +155,31 @@ export function AppShell({ activeView, onNavigate, children, demoMode }: AppShel
                   </li>
                 ))}
               </ul>
-            </section>
-          ))}
+            ) : null}
+          </section>
         </nav>
 
         <div className="sidebar-footer">
-          <div className="connection-chip">
+          <div className={`connection-chip${serviceWarning ? " is-warning" : ""}`}>
             <span aria-hidden="true" />
-            {demoMode ? "Demo workspace" : "API connected"}
+            {demoMode
+              ? "Demo services ready"
+              : systemStatus.isPending
+                ? "Checking services"
+                : systemStatus.isError
+                  ? "Service status unavailable"
+                  : systemStatus.data?.workerReady
+                    ? "API + worker ready"
+                    : "API ready · worker offline"}
           </div>
+          {!demoMode && systemStatus.data && !systemStatus.data.workerReady ? (
+            <p className="service-hint">Start: <code>uv run dataset-foundry worker</code></p>
+          ) : null}
           <button className="theme-control" type="button" onClick={cycleTheme}>
             {theme === "dark" ? <MoonStar size={16} /> : <Sun size={16} />}
             <span>Theme: {theme}</span>
           </button>
-          <p>Local-first · API boundary `/api/v1`</p>
+          <p>Local-first · API boundary <code>/api/v1</code></p>
         </div>
       </aside>
 
