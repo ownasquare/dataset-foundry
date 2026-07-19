@@ -152,15 +152,15 @@ Have a separate agent inspect only the changed contracts and rendered behavior. 
 
 ### Task 5: Document and publish the completed continuation
 
-- [ ] **Step 1: Update public documentation and the dated completion record**
+- [x] **Step 1: Update public documentation and the dated completion record**
 
 Document the seven hashes, additive `quality_reasons`, raw-code compatibility, stable problem codes, selector recovery, exact validation, and the unchanged external boundaries. Update `CHANGELOG.md` under Unreleased.
 
-- [ ] **Step 2: Refresh continuation artifacts**
+- [x] **Step 2: Refresh continuation artifacts**
 
 Create or refresh the canonical 12-section handoff at `/Users/fortunevieyra/Documents/Github/beladed.com/docs/handoffs/2026-07-19-codex-dataset-foundry-p2-workflow-polish.handoff.mdc`, link it under `docs/handoffs/`, and create the required Beladed documentation record without touching Beladed runtime source.
 
-- [ ] **Step 3: Commit and publish intentionally**
+- [x] **Step 3: Commit and publish intentionally**
 
 Run: `git diff --check`
 
@@ -168,6 +168,6 @@ Run: `git status --short`
 
 Commit the validated implementation and documentation, push `main` to `ownasquare/dataset-foundry`, verify local/remote SHA equality, and wait for the final GitHub Actions run to pass.
 
-- [ ] **Step 4: Record gated next moves truthfully**
+- [x] **Step 4: Record gated next moves truthfully**
 
 Keep live paid-provider smoke, a supported tag/PyPI release, hosted authenticated infrastructure, and optional Argilla/distilabel integration as separate owner-decision items. Do not infer authorization from completion of these local P2 improvements.

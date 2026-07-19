@@ -1,0 +1,21 @@
+---
+description: "Pointer to the canonical Dataset Foundry P2 workflow polish continuation package"
+alwaysApply: false
+---
+
+# Dataset Foundry P2 workflow polish handoff pointer
+
+This is a maintainer continuity record. Public adopters should use the repository's
+[completion record](../dataset-foundry/2026-07-19-handoff-p2-workflow-polish.md), README, and linked
+guides.
+
+The maintainer-only, self-contained 12-section handoff is maintained at:
+
+`/Users/fortunevieyra/Documents/Github/beladed.com/docs/handoffs/2026-07-19-codex-dataset-foundry-p2-workflow-polish.handoff.mdc`
+
+Public repository:
+
+https://github.com/ownasquare/dataset-foundry
+
+This file is intentionally a small pointer rather than a second copy so continuation details cannot
+drift between the public project and the maintainer workspace.
