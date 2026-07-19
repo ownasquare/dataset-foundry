@@ -15,6 +15,7 @@ import { ProjectsView } from "./features/ProjectsView";
 import { ReviewView } from "./features/ReviewView";
 import { RunsView } from "./features/RunsView";
 import { SettingsView } from "./features/SettingsView";
+import { useViewNavigation } from "./navigation";
 
 function createQueryClient(): QueryClient {
   return new QueryClient({
@@ -31,16 +32,16 @@ export interface AppProps {
   initialView?: ViewKey;
 }
 
-export function App({ api, demoMode = false, initialView = "overview" }: AppProps) {
+export function App({ api, demoMode = false, initialView }: AppProps) {
   const [queryClient] = useState(createQueryClient);
   const [demoApi] = useState(() => createDemoApi());
-  const [activeView, setActiveView] = useState<ViewKey>(initialView);
+  const { activeView, navigateTo } = useViewNavigation(initialView);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const selectedApi = api ?? (demoMode ? demoApi : httpApi);
 
   const openGenerate = (projectId?: string) => {
     if (projectId) setSelectedProjectId(projectId);
-    setActiveView("generate");
+    navigateTo("generate");
   };
 
   let view;
@@ -52,30 +53,34 @@ export function App({ api, demoMode = false, initialView = "overview" }: AppProp
       view = (
         <GenerateView
           initialProjectId={selectedProjectId}
-          onCreateProject={() => setActiveView("projects")}
-          onOpenRuns={() => setActiveView("runs")}
+          onCreateProject={() => navigateTo("projects")}
+          onOpenRuns={() => navigateTo("runs")}
         />
       );
       break;
     case "runs":
       view = (
         <RunsView
-          onGenerate={() => setActiveView("generate")}
-          onReview={() => setActiveView("review")}
+          onGenerate={() => navigateTo("generate")}
+          onReview={() => navigateTo("review")}
         />
       );
       break;
     case "review":
-      view = <ReviewView onGenerate={() => setActiveView("generate")} />;
+      view = <ReviewView onGenerate={() => navigateTo("generate")} />;
       break;
     case "exports":
-      view = <ExportsView onGenerate={() => setActiveView("generate")} />;
+      view = <ExportsView onGenerate={() => navigateTo("generate")} />;
       break;
     case "settings":
       view = <SettingsView demoMode={demoMode} />;
       break;
     default:
-      view = <OverviewView onNavigate={(next) => next === "generate" ? openGenerate() : setActiveView(next)} />;
+      view = (
+        <OverviewView
+          onNavigate={(next) => (next === "generate" ? openGenerate() : navigateTo(next))}
+        />
+      );
   }
 
   return (
@@ -83,7 +88,7 @@ export function App({ api, demoMode = false, initialView = "overview" }: AppProp
       <ThemeProvider>
         <QueryClientProvider client={queryClient}>
           <ApiContext.Provider value={selectedApi}>
-            <AppShell activeView={activeView} onNavigate={setActiveView} demoMode={demoMode}>
+            <AppShell activeView={activeView} onNavigate={navigateTo} demoMode={demoMode}>
               {view}
             </AppShell>
           </ApiContext.Provider>

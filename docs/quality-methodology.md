@@ -35,6 +35,17 @@ applicable, and a human-readable explanation.
 The run persists the threshold and component evidence, so changing defaults later does not change
 the historical decision.
 
+## What reviewers see
+
+The workbench translates built-in reason codes into short labels such as **Near duplicate** or
+**Below quality threshold**, then shows the persisted evidence directly beneath the label. Custom
+or newer scorer codes are safely humanized and remain reviewable even when the current workbench
+does not know them. The unchanged raw codes remain available under **Show raw reason codes** for
+debugging, API interoperability, and audit trails.
+
+Missing evidence is never invented. The UI identifies the signal as custom or newer and directs the
+reviewer to the component score details before deciding.
+
 ## Similarity
 
 The key-free embedder hashes normalized token unigrams and bigrams into a fixed-width vector and
@@ -66,4 +77,3 @@ Export groups examples by root seed lineage before assigning train, validation, 
 Related synthetic families therefore do not cross splits merely because their row IDs differ. The
 manifest records actual split counts and ratios; small datasets are not described as exactly 90/5/5
 when indivisible groups make that impossible.
-

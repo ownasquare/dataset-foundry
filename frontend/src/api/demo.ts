@@ -141,6 +141,12 @@ const INITIAL_CANDIDATES: Candidate[] = [
     nearestSimilarity: 0.74,
     nearestCandidateId: "candidate-144",
     reasonCodes: ["REFERENCE_DETAIL_EXPANDED"],
+    qualityReasons: [
+      {
+        code: "REFERENCE_DETAIL_EXPANDED",
+        evidence: "The response adds rain-cover usage guidance that the source did not provide.",
+      },
+    ],
     scores: [
       { label: "Completeness", value: 0.92, explanation: "Answers where the cover is stored." },
       { label: "Seed novelty", value: 0.81, explanation: "Changes the wording and user intent." },
@@ -165,6 +171,7 @@ const INITIAL_CANDIDATES: Candidate[] = [
     nearestSimilarity: 0.61,
     nearestCandidateId: "candidate-118",
     reasonCodes: [],
+    qualityReasons: [],
     scores: [
       { label: "Completeness", value: 0.98, explanation: "Directly answers the duration question." },
       { label: "Seed novelty", value: 0.93, explanation: "Introduces a realistic use case." },
@@ -188,6 +195,16 @@ const INITIAL_CANDIDATES: Candidate[] = [
     nearestSimilarity: 0.48,
     nearestCandidateId: null,
     reasonCodes: ["CONTRADICTS_REFERENCE", "UNSUPPORTED_CARE_INSTRUCTION"],
+    qualityReasons: [
+      {
+        code: "CONTRADICTS_REFERENCE",
+        evidence: "High-heat drying contradicts the source instruction to lay the item flat.",
+      },
+      {
+        code: "UNSUPPORTED_CARE_INSTRUCTION",
+        evidence: "The source does not support tumble drying.",
+      },
+    ],
     scores: [
       { label: "Completeness", value: 0.71, explanation: "Provides a complete but incorrect answer." },
       { label: "Seed novelty", value: 0.86, explanation: "Wording is sufficiently different." },

@@ -1,5 +1,15 @@
 import { expect, test } from "@playwright/test";
 
+const VIEW_HEADINGS = {
+  overview: "Turn seed examples into training-ready data",
+  generate: "Generate a dataset",
+  review: "Review candidates",
+  exports: "Exports",
+  projects: "Projects",
+  runs: "Generation runs",
+  settings: "Settings",
+} as const;
+
 test.beforeEach(async ({ page }) => {
   const errors: string[] = [];
   page.on("console", (message) => {
@@ -47,6 +57,45 @@ test("opens every workbench view, provenance details, and both themes", async ({
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
 });
 
+test("restores every direct workbench URL and normalizes invalid hashes", async ({ page }) => {
+  for (const [view, heading] of Object.entries(VIEW_HEADINGS)) {
+    await page.goto(`/?demo=1#${view}`, { waitUntil: "domcontentloaded" });
+    await expect(page.getByRole("heading", { name: heading })).toBeVisible();
+    await expect(page).toHaveURL(new RegExp(`\\?demo=1#${view}$`));
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await expect(page.getByRole("heading", { name: heading })).toBeVisible();
+    await expect(page).toHaveURL(new RegExp(`\\?demo=1#${view}$`));
+  }
+
+  await page.goto("/?demo=1#not-a-view", { waitUntil: "domcontentloaded" });
+  await expect(page.getByRole("heading", { name: VIEW_HEADINGS.overview })).toBeVisible();
+  await expect(page).toHaveURL(/\?demo=1#overview$/);
+});
+
+test("keeps browser history and the mobile drawer synchronized", async ({ page }) => {
+  await page.getByRole("button", { name: "Review", exact: true }).click();
+  await expect(page).toHaveURL(/#review$/);
+  await page.getByRole("button", { name: "Exports", exact: true }).click();
+  await expect(page).toHaveURL(/#exports$/);
+
+  await page.goBack();
+  await expect(page.getByRole("heading", { name: VIEW_HEADINGS.review })).toBeVisible();
+  await expect(page).toHaveURL(/#review$/);
+  await page.goForward();
+  await expect(page.getByRole("heading", { name: VIEW_HEADINGS.exports })).toBeVisible();
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await expect(page.getByRole("heading", { name: VIEW_HEADINGS.exports })).toBeVisible();
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  const sidebar = page.getByRole("complementary", { name: "Primary navigation" });
+  await page.getByRole("button", { name: "Open navigation" }).click();
+  await expect(sidebar).toBeVisible();
+  await page.goBack();
+  await expect(page.getByRole("heading", { name: VIEW_HEADINGS.review })).toBeVisible();
+  await expect(sidebar).toBeHidden();
+  await expect(page.locator("#main-content")).toBeFocused();
+});
+
 test("keeps supporting navigation out of the core path and exposes concise help", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Generate", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Projects", exact: true })).toBeHidden();
@@ -62,6 +111,22 @@ test("keeps supporting navigation out of the core path and exposes concise help"
 test("records a review decision and creates a downloadable export", async ({ page }) => {
   await page.getByRole("button", { name: "Review", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Review candidates" })).toBeVisible();
+  await expect(page.getByText("Adds an unsupported detail", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("The response adds rain-cover usage guidance that the source did not provide."),
+  ).toBeVisible();
+  const rawReasons = page.locator("details.disclosure").filter({
+    has: page.getByText("Show raw reason codes", { exact: true }),
+  });
+  await expect(rawReasons).not.toHaveAttribute("open", "");
+  await rawReasons.locator("summary").click();
+  await expect(rawReasons.getByText("REFERENCE_DETAIL_EXPANDED", { exact: true })).toBeVisible();
+  const reasonHelp = page.locator('summary[aria-label="About quality reasons"]');
+  await reasonHelp.focus();
+  await reasonHelp.press("Enter");
+  await expect(page.getByText(/These labels summarize automated checks/)).toBeVisible();
+  await reasonHelp.press("Escape");
+  await expect(reasonHelp.locator("..")).not.toHaveAttribute("open", "");
   await page.getByPlaceholder("Explain the decision for future reviewers").fill(
     "Grounding is consistent with the source seed.",
   );

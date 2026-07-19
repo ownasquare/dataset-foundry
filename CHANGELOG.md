@@ -14,12 +14,17 @@ All notable changes are recorded here. The format follows
 - Functional run cancellation in the workbench.
 - Public contributor, support, issue, pull-request, and conduct guidance.
 - Injectable custom quality-scorer protocol and runnable example.
+- Stable, refresh-safe URLs for all seven workbench views.
+- Structured candidate quality reasons with readable labels, evidence, and raw-code disclosure.
+- Stable RFC 7807 error codes and field locations for export dependencies.
 
 ### Changed
 
 - Primary navigation now centers Generate, Review, and Exports while supporting views stay under
   progressive disclosure.
 - The README now leads with first success, expected results, limitations, and extension paths.
+- Export creation now preserves form input, focuses a stale project/run selector, and never silently
+  substitutes another run after an explicit selection becomes invalid.
 
 ## [0.1.0] - 2026-07-18
 

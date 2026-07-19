@@ -17,9 +17,11 @@ import type { Candidate, CandidateDecision, ReviewDecision } from "../api/types"
 import { Disclosure } from "../components/Disclosure";
 import { PageHeader } from "../components/PageHeader";
 import { ProgressBar } from "../components/ProgressBar";
+import { QualityReasonList } from "../components/QualityReasonList";
 import { StatePanel } from "../components/StatePanel";
 import { StatusBadge } from "../components/StatusBadge";
 import { formatPercent, formatQuality } from "../components/format";
+import { humanizeIdentifier } from "../components/qualityReasonPresentation";
 
 type ReviewFilter = CandidateDecision | "all";
 
@@ -191,10 +193,11 @@ export function ReviewView({ onGenerate }: { onGenerate: () => void }) {
                   </div>
                   <h2 id="candidate-title">{selected.generatedPrompt}</h2>
                   <p className="candidate-answer">{selected.generatedResponse}</p>
-                  {selected.reasonCodes.length ? (
-                    <div className="reason-codes" aria-label="Quality reason codes">
-                      {selected.reasonCodes.map((code) => <code key={code}>{code}</code>)}
-                    </div>
+                  {selected.qualityReasons.length ? (
+                    <QualityReasonList
+                      reasons={selected.qualityReasons}
+                      rawCodes={selected.reasonCodes}
+                    />
                   ) : (
                     <div className="inline-success"><ShieldCheck size={16} /> Automated gates found no blocking issue.</div>
                   )}
@@ -223,7 +226,11 @@ export function ReviewView({ onGenerate }: { onGenerate: () => void }) {
                     <div className="score-list">
                       {selected.scores.map((score) => (
                         <div key={score.label}>
-                          <ProgressBar value={score.value} max={1} label={score.label} />
+                          <ProgressBar
+                            value={score.value}
+                            max={1}
+                            label={humanizeIdentifier(score.label)}
+                          />
                           <p>{score.explanation}</p>
                         </div>
                       ))}

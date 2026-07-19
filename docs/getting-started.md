@@ -38,6 +38,11 @@ Docker demo data, so use it only when a clean workspace is intended.
 Projects, Runs, and Settings are available under **More**. They are supporting views, not required
 to understand the seed → generate → review → export path.
 
+Every workbench view has a stable, refresh-safe URL. Add one of these hashes to the app URL when
+sharing or bookmarking a starting point: `#overview`, `#generate`, `#review`, `#exports`,
+`#projects`, `#runs`, or `#settings`. Browser back and forward keep the visible view in sync. IDs,
+review notes, provider settings, and unfinished form values are intentionally not stored in the URL.
+
 ## Native contributor setup
 
 Prerequisites: Python 3.11 or newer, [uv](https://docs.astral.sh/uv/), Node.js 20 or newer, and npm.

@@ -115,12 +115,29 @@ evidence:
 
 Valid decisions are `accepted`, `rejected`, and `needs_review`.
 
+Candidate responses keep the original arrays and add an easier structured form:
+
+```json
+{
+  "reason_codes": ["near_duplicate"],
+  "explanations": ["Similarity to an accepted example is 0.94."],
+  "quality_reasons": [
+    {"code": "near_duplicate", "evidence": "Similarity to an accepted example is 0.94."}
+  ]
+}
+```
+
+`quality_reasons` pairs each stored code with its evidence in order. Existing clients may continue
+using `reason_codes` and `explanations`; new clients should prefer the structured field and retain
+unknown codes rather than discarding them.
+
 ## Exports
 
 `POST /api/v1/runs/{run_id}/exports` creates an immutable snapshot from the effective accepted set.
 
 ```json
 {
+  "project_id": "project-id",
   "name": "Support fine-tuning v1",
   "formats": ["parquet"],
   "train_percent": 90,
@@ -128,6 +145,9 @@ Valid decisions are `accepted`, `rejected`, and `needs_review`.
   "test_percent": 5
 }
 ```
+
+`project_id` is optional for older API clients, but recommended. It lets the server reject a stale
+or mismatched project/run selection before packaging any data.
 
 Use `GET /api/v1/exports`, `GET /api/v1/exports/{export_id}`, and
 `GET /api/v1/exports/{export_id}/download/{filename}` to inspect and retrieve artifacts.
@@ -142,11 +162,20 @@ Errors use an RFC 7807-style response and include the request ID used in logs:
   "title": "Validation error",
   "status": 422,
   "detail": "One or more fields are invalid.",
+  "code": "request_validation_failed",
   "instance": "/api/v1/runs",
   "request_id": "...",
   "errors": [{"loc": ["body", "provider"], "msg": "...", "type": "..."}]
 }
 ```
 
-Clients should branch on `status` and field-level `errors`; `title` and `detail` are intended for
-people and may become more specific over time.
+Clients should branch on `code` and field-level `errors`; `title` and `detail` are intended for
+people and may become more specific over time. Export dependency failures use these stable codes:
+
+| Code | Field | Meaning |
+|---|---|---|
+| `export_project_not_found` | `body.project_id` | The selected project no longer exists. |
+| `export_run_not_found` | `path.run_id` | The selected run no longer exists. |
+| `export_run_project_mismatch` | `path.run_id` | The run does not belong to the selected project. |
+| `export_run_not_complete` | `path.run_id` | The run is not in a completed state. |
+| `export_run_has_no_accepted_examples` | `path.run_id` | No effective accepted examples can be packaged. |

@@ -47,6 +47,8 @@ code { max-width: 100%; overflow-wrap: anywhere; border-radius: 5px; background:
 .form-grid--three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .form-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 0.7rem; margin-top: 1.15rem; }
 .form-error { margin: 0.8rem 0 0; border-left: 3px solid var(--danger); color: var(--danger); padding: 0.45rem 0.7rem; }
+.field-error { color: var(--danger); line-height: 1.4; }
+.field select[aria-invalid="true"], .field input[aria-invalid="true"] { border-color: var(--danger); }
 .eyebrow { margin: 0 0 0.25rem; color: var(--accent); font-size: 0.71rem; font-weight: 780; letter-spacing: 0.09em; text-transform: uppercase; }
 .plain-list { margin: 0; padding-left: 1.2rem; }
 .plain-list li + li { margin-top: 0.4rem; }

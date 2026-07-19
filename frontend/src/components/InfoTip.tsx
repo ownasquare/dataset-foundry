@@ -11,7 +11,7 @@ export function InfoTip({ label, children }: { label: string; children: ReactNod
         event.currentTarget.querySelector("summary")?.focus();
       }}
     >
-      <summary aria-label={`About ${label.toLowerCase()}`}>
+      <summary aria-label={`About ${label.toLowerCase()}`} tabIndex={0}>
         <CircleHelp size={15} aria-hidden="true" />
       </summary>
       <div className="info-tip__content" role="note">

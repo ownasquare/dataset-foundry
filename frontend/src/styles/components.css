@@ -217,6 +217,14 @@
 .candidate-review__topline > span:last-child { color: var(--muted); font-size: 0.7rem; text-transform: capitalize; }
 .candidate-answer { margin: 0; color: var(--text); font-size: 1rem; line-height: 1.65; }
 .reason-codes { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-top: 0.8rem; }
+.quality-reasons { display: grid; gap: 0.7rem; margin-top: 0.9rem; }
+.quality-reasons__heading { display: flex; align-items: center; gap: 0.35rem; color: var(--ink); font-size: 0.76rem; }
+.quality-reasons__list { display: grid; gap: 0.45rem; margin: 0; padding: 0; list-style: none; }
+.quality-reasons__list li { display: grid; gap: 0.15rem; border-left: 3px solid var(--warning); border-radius: 0 7px 7px 0; background: var(--surface-subtle); padding: 0.55rem 0.65rem; }
+.quality-reasons__list strong { color: var(--ink); font-size: 0.73rem; }
+.quality-reasons__list span { color: var(--muted); font-size: 0.68rem; line-height: 1.45; }
+.quality-reasons .disclosure { margin-top: 0; }
+.quality-reasons .reason-codes { margin-top: 0; }
 .evidence-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
 .evidence-heading, .settings-section__heading { display: flex; align-items: flex-start; gap: 0.55rem; margin-bottom: 0.8rem; }
 .evidence-heading svg, .settings-section__heading > svg { color: var(--accent); }

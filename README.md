@@ -47,7 +47,7 @@ to use for a second walkthrough.
 |---|---|---|
 | Import | Add representative JSONL, JSON, CSV, or Parquet seeds | Schema, upload, row, duplicate, and fingerprint checks |
 | Generate | Pick a provider, target, and quality bounds | Cost/candidate preflight, explicit data-transfer consent, durable jobs |
-| Review | Inspect accepted, borderline, and rejected examples | Source lineage, reason codes, similarity, preserved human overrides |
+| Review | Inspect accepted, borderline, and rejected examples | Source lineage, readable evidence, raw reason codes, similarity, preserved human overrides |
 | Export | Choose a fine-tuning format and data split | Lineage-grouped splits, dataset card, manifest, byte counts, SHA-256 |
 
 Operational views such as Projects, Runs, and Settings stay under **More** so the main workflow stays

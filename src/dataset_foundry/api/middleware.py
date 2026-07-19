@@ -55,6 +55,7 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
                         "title": "Unauthorized",
                         "status": 401,
                         "detail": "A valid API key is required.",
+                        "code": "api_key_required",
                         "instance": request.url.path,
                         "request_id": request_id,
                     },

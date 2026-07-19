@@ -26,6 +26,7 @@ from dataset_foundry.api.schemas import (
     ProjectCreate,
     ProjectView,
     ProvidersView,
+    QualityReasonView,
     RecipeCreate,
     RecipeView,
     ReviewCreate,
@@ -48,6 +49,7 @@ from dataset_foundry.domain import (
 )
 from dataset_foundry.generation.planner import build_preflight
 from dataset_foundry.ingestion import SUPPORTED_EXTENSIONS, load_seed_dataset
+from dataset_foundry.persistence import RecordNotFoundError
 from dataset_foundry.persistence.models import (
     CandidateRecord,
     DatasetRecord,
@@ -220,6 +222,22 @@ def _candidate_view(
         source_id=record.id,
         root_seed_id=record.source_seed_ids_json[0] if record.source_seed_ids_json else None,
     )
+    explanations_by_code = {
+        component.get("reason_code"): component.get("explanation")
+        for component in (report.components_json if report else [])
+        if component.get("reason_code") and component.get("explanation")
+    }
+    quality_reasons = [
+        QualityReasonView(
+            code=code,
+            evidence=(
+                report.explanations_json[index]
+                if report and index < len(report.explanations_json)
+                else explanations_by_code.get(code)
+            ),
+        )
+        for index, code in enumerate(report.reason_codes_json if report else [])
+    ]
     return CandidateView(
         id=record.id,
         run_id=record.run_id,
@@ -230,6 +248,7 @@ def _candidate_view(
         effective_decision=CandidateDecision(effective) if effective else None,
         quality_score=record.quality_score,
         reason_codes=report.reason_codes_json if report else [],
+        quality_reasons=quality_reasons,
         components=(
             [QualityComponent.model_validate(component) for component in report.components_json]
             if report
@@ -685,9 +704,50 @@ def create_export(
     request: Request,
 ) -> ExportView:
     container = _container(request)
-    run = container.repositories.runs.get(run_id)
+    if payload.project_id is not None:
+        try:
+            container.repositories.projects.get(payload.project_id)
+        except RecordNotFoundError as exc:
+            raise ApiProblem(
+                404,
+                "Project not found",
+                "This project is no longer available. Choose another project.",
+                code="export_project_not_found",
+                errors=[{"loc": ["body", "project_id"], "msg": str(exc), "type": "not_found"}],
+            ) from exc
+    try:
+        run = container.repositories.runs.get(run_id)
+    except RecordNotFoundError as exc:
+        raise ApiProblem(
+            404,
+            "Run not found",
+            "This run is no longer available. Choose another completed run.",
+            code="export_run_not_found",
+            errors=[{"loc": ["path", "run_id"], "msg": str(exc), "type": "not_found"}],
+        ) from exc
+    dataset = container.repositories.datasets.get(run.dataset_id)
+    if payload.project_id is not None and dataset.project_id != payload.project_id:
+        raise ApiProblem(
+            409,
+            "Run does not belong to project",
+            "This run no longer belongs to the selected project.",
+            code="export_run_project_mismatch",
+            errors=[
+                {
+                    "loc": ["path", "run_id"],
+                    "msg": "Run and project do not match.",
+                    "type": "conflict",
+                }
+            ],
+        )
     if run.status != RunStatus.completed.value:
-        raise ApiProblem(409, "Run is not complete", "Complete the run before exporting it.")
+        raise ApiProblem(
+            409,
+            "Run is not complete",
+            "This run is not ready to export. Choose a completed run.",
+            code="export_run_not_complete",
+            errors=[{"loc": ["path", "run_id"], "msg": "Run is not complete.", "type": "conflict"}],
+        )
     try:
         record = container.create_export(
             run_id,
@@ -700,7 +760,25 @@ def create_export(
             },
         )
     except ValueError as exc:
-        raise ApiProblem(422, "Export unavailable", str(exc)) from exc
+        detail = str(exc)
+        if "accepted" in detail.lower():
+            raise ApiProblem(
+                409,
+                "No accepted examples",
+                (
+                    "This run has no accepted examples to package. "
+                    "Review candidates or choose another run."
+                ),
+                code="export_run_has_no_accepted_examples",
+                errors=[{"loc": ["path", "run_id"], "msg": detail, "type": "conflict"}],
+            ) from exc
+        raise ApiProblem(
+            422,
+            "Export unavailable",
+            detail,
+            code="export_unavailable",
+            errors=[{"loc": ["body"], "msg": detail, "type": "value_error"}],
+        ) from exc
     return _export_view(record)
 
 

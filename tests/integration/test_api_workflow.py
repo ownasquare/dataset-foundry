@@ -110,6 +110,47 @@ def test_http_seed_to_export_workflow(tmp_path: Path) -> None:
     run = queued.json()
     assert run["status"] == "queued"
 
+    export_payload = {
+        "project_id": project["id"],
+        "name": "Support canonical snapshot",
+        "formats": ["canonical_jsonl"],
+        "train_percent": 80,
+        "validation_percent": 10,
+        "test_percent": 10,
+    }
+    missing_project = client.post(
+        f"/api/v1/runs/{run['id']}/exports",
+        json={**export_payload, "project_id": "missing-project"},
+    )
+    assert missing_project.status_code == 404
+    assert missing_project.json()["code"] == "export_project_not_found"
+    assert missing_project.json()["errors"][0]["loc"] == ["body", "project_id"]
+
+    missing_run = client.post(
+        "/api/v1/runs/missing-run/exports",
+        json=export_payload,
+    )
+    assert missing_run.status_code == 404
+    assert missing_run.json()["code"] == "export_run_not_found"
+    assert missing_run.json()["errors"][0]["loc"] == ["path", "run_id"]
+
+    other_project_response = client.post(
+        "/api/v1/projects",
+        json={"name": "Other API project"},
+    )
+    assert other_project_response.status_code == 201
+    mismatch = client.post(
+        f"/api/v1/runs/{run['id']}/exports",
+        json={**export_payload, "project_id": other_project_response.json()["id"]},
+    )
+    assert mismatch.status_code == 409
+    assert mismatch.json()["code"] == "export_run_project_mismatch"
+
+    incomplete = client.post(f"/api/v1/runs/{run['id']}/exports", json=export_payload)
+    assert incomplete.status_code == 409
+    assert incomplete.json()["code"] == "export_run_not_complete"
+    assert incomplete.json()["errors"][0]["loc"] == ["path", "run_id"]
+
     worker_result = asyncio.run(container.worker().run_once())
     assert worker_result is not None and worker_result.status == "completed"
 
@@ -127,6 +168,10 @@ def test_http_seed_to_export_workflow(tmp_path: Path) -> None:
     assert candidates[0]["example"]["messages"][0]["role"] in {"system", "user"}
     assert candidates[0]["source_examples"]
     assert candidates[0]["source_examples"][0]["messages"][0]["role"] == "user"
+    assert "quality_reasons" in candidates[0]
+    assert [item["code"] for item in candidates[0]["quality_reasons"]] == candidates[0][
+        "reason_codes"
+    ]
 
     review = client.post(
         f"/api/v1/candidates/{candidates[0]['id']}/reviews",
@@ -141,13 +186,7 @@ def test_http_seed_to_export_workflow(tmp_path: Path) -> None:
 
     exported = client.post(
         f"/api/v1/runs/{run['id']}/exports",
-        json={
-            "name": "Support canonical snapshot",
-            "formats": ["canonical_jsonl"],
-            "train_percent": 80,
-            "validation_percent": 10,
-            "test_percent": 10,
-        },
+        json=export_payload,
     )
     assert exported.status_code == 201, exported.text
     export = exported.json()
@@ -304,11 +343,18 @@ def test_candidate_api_uses_server_filtered_cursor_pagination(tmp_path: Path) ->
         )
         container.repositories.candidates.add(run.id, candidate)
         decision = CandidateDecision.needs_review if index == 104 else CandidateDecision.accepted
+        report_kwargs: dict[str, object] = {}
+        if index == 104:
+            report_kwargs = {
+                "reason_codes": ["policy_not_grounded"],
+                "explanations": ["The answer needs an explicit policy citation."],
+            }
         container.repositories.candidates.save_quality_report(
             QualityReport(
                 candidate_id=candidate.id,
                 score=0.9,
                 automated_decision=decision,
+                **report_kwargs,
             )
         )
 
@@ -335,6 +381,53 @@ def test_candidate_api_uses_server_filtered_cursor_pagination(tmp_path: Path) ->
     )
     assert needs_review.status_code == 200
     assert [item["id"] for item in needs_review.json()["items"]] == ["pagination-candidate-104"]
+    reason = needs_review.json()["items"][0]["quality_reasons"][0]
+    assert reason == {
+        "code": "policy_not_grounded",
+        "evidence": "The answer needs an explicit policy citation.",
+    }
+
+
+def test_export_problem_identifies_a_completed_run_without_accepted_examples(
+    tmp_path: Path,
+) -> None:
+    container = make_container(tmp_path)
+    project = container.repositories.projects.create(name="Empty accepted pool")
+    seed = TrainingExample(
+        id="empty-export-seed",
+        messages=[
+            ChatMessage(role="user", content="How should an account change be verified?"),
+            ChatMessage(role="assistant", content="Save the change and read it back."),
+        ],
+    )
+    dataset = container.repositories.datasets.create(
+        project_id=project.id,
+        name="Empty export seeds",
+        fingerprint=fingerprint_dataset([seed]),
+        examples=[seed],
+    )
+    recipe = GenerationRecipe(name="Empty export recipe", target_count=1)
+    recipe_record = container.repositories.recipes.create(dataset.id, recipe)
+    run = container.repositories.runs.create(
+        dataset_id=dataset.id,
+        recipe_id=recipe_record.id,
+        target_count=recipe.target_count,
+        candidate_budget=recipe.candidate_budget,
+        dataset_fingerprint=dataset.fingerprint,
+        recipe_fingerprint=recipe_record.fingerprint,
+    )
+    container.repositories.runs.transition(run.id, RunStatus.running)
+    container.repositories.runs.transition(run.id, RunStatus.completed)
+    client = TestClient(create_app(container))
+
+    response = client.post(
+        f"/api/v1/runs/{run.id}/exports",
+        json={"project_id": project.id, "formats": ["canonical_jsonl"]},
+    )
+
+    assert response.status_code == 409
+    assert response.json()["code"] == "export_run_has_no_accepted_examples"
+    assert response.json()["errors"][0]["loc"] == ["path", "run_id"]
 
 
 def test_problem_response_has_request_id(tmp_path: Path) -> None:
@@ -345,6 +438,7 @@ def test_problem_response_has_request_id(tmp_path: Path) -> None:
     assert response.status_code == 404
     assert response.headers["x-request-id"] == response.json()["request_id"]
     assert response.headers["content-type"].startswith("application/problem+json")
+    assert response.json()["code"] == "record_not_found"
 
 
 def test_built_frontend_and_spa_fallback_are_served(tmp_path: Path) -> None:

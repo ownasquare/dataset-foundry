@@ -27,6 +27,13 @@ interface ProblemDetail {
   code?: string;
   request_id?: string;
   retryable?: boolean;
+  errors?: unknown;
+}
+
+export interface ApiIssue {
+  loc: string[];
+  msg: string;
+  type: string;
 }
 
 export class ApiError extends Error {
@@ -34,10 +41,17 @@ export class ApiError extends Error {
   readonly code: string;
   readonly requestId: string | null;
   readonly retryable: boolean;
+  readonly issues: ApiIssue[];
 
   constructor(
     message: string,
-    options: { status: number; code?: string; requestId?: string | null; retryable?: boolean },
+    options: {
+      status: number;
+      code?: string;
+      requestId?: string | null;
+      retryable?: boolean;
+      issues?: ApiIssue[];
+    },
   ) {
     super(message);
     this.name = "ApiError";
@@ -45,7 +59,21 @@ export class ApiError extends Error {
     this.code = options.code ?? "request_failed";
     this.requestId = options.requestId ?? null;
     this.retryable = options.retryable ?? options.status >= 500;
+    this.issues = options.issues ?? [];
   }
+}
+
+function problemIssues(value: unknown): ApiIssue[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((raw) => {
+    if (typeof raw !== "object" || raw === null) return [];
+    const issue = raw as Record<string, unknown>;
+    return [{
+      loc: Array.isArray(issue.loc) ? issue.loc.map(String) : [],
+      msg: String(issue.msg ?? "Invalid value"),
+      type: String(issue.type ?? "value_error"),
+    }];
+  });
 }
 
 function apiUrl(path: string): string {
@@ -96,7 +124,7 @@ export async function fetchJson<T>(
     }
 
     const contentType = response.headers.get("content-type") ?? "";
-    const payload: unknown = contentType.includes("application/json")
+    const payload: unknown = contentType.includes("json")
       ? await response.json()
       : await response.text();
 
@@ -113,6 +141,7 @@ export async function fetchJson<T>(
         code: problem.code ?? "request_failed",
         requestId: problem.request_id ?? response.headers.get("x-request-id"),
         retryable: problem.retryable ?? response.status >= 500,
+        issues: problemIssues(problem.errors),
       });
     }
 
@@ -294,6 +323,39 @@ function candidateFromWire(value: Record<string, unknown>): Candidate {
     : Array.isArray(value.scores)
       ? value.scores
       : [];
+  const rawReasonCodes = Array.isArray(value.reason_codes ?? value.reasonCodes)
+    ? ((value.reason_codes ?? value.reasonCodes) as unknown[]).map(String)
+    : [];
+  const rawExplanations = Array.isArray(value.explanations)
+    ? value.explanations.map(String)
+    : [];
+  const componentEvidence = new Map(
+    rawScores.flatMap((raw) => {
+      if (typeof raw !== "object" || raw === null) return [];
+      const component = raw as Record<string, unknown>;
+      const code = String(component.reason_code ?? component.reasonCode ?? "").trim();
+      const explanation = String(component.explanation ?? "").trim();
+      return code && explanation ? [[code, explanation] as const] : [];
+    }),
+  );
+  const structuredReasons = Array.isArray(value.quality_reasons ?? value.qualityReasons)
+    ? ((value.quality_reasons ?? value.qualityReasons) as unknown[]).flatMap((raw) => {
+        if (typeof raw !== "object" || raw === null) return [];
+        const item = raw as Record<string, unknown>;
+        const code = String(item.code ?? "").trim();
+        if (!code) return [];
+        return [{
+          code,
+          evidence: item.evidence == null ? null : String(item.evidence),
+        }];
+      })
+    : [];
+  const qualityReasons = structuredReasons.length
+    ? structuredReasons
+    : rawReasonCodes.map((code, index) => ({
+        code,
+        evidence: rawExplanations[index] ?? componentEvidence.get(code) ?? null,
+      }));
   return {
     id: String(value.id ?? ""),
     runId: String(value.run_id ?? value.runId ?? ""),
@@ -326,9 +388,8 @@ function candidateFromWire(value: Record<string, unknown>): Candidate {
       value.nearestCandidateId == null
         ? null
         : String(value.nearest_match_id ?? value.nearest_candidate_id ?? value.nearestCandidateId),
-    reasonCodes: Array.isArray(value.reason_codes ?? value.reasonCodes)
-      ? ((value.reason_codes ?? value.reasonCodes) as unknown[]).map(String)
-      : [],
+    reasonCodes: rawReasonCodes.length ? rawReasonCodes : qualityReasons.map((reason) => reason.code),
+    qualityReasons,
     scores: rawScores.map((score) => {
       const item = score as Record<string, unknown>;
       return {
@@ -635,6 +696,7 @@ export const httpApi: DatasetFoundryApi = {
       {
       method: "POST",
       body: JSON.stringify({
+        project_id: input.projectId,
         name: input.name,
         formats: [input.format],
         train_percent: input.trainPercent,

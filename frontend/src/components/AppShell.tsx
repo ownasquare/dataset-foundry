@@ -13,7 +13,7 @@ import {
   Sun,
   X,
 } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import { useSystemStatus } from "../api/queries";
 import type { ViewKey } from "../api/types";
@@ -46,14 +46,16 @@ export function AppShell({ activeView, onNavigate, children, demoMode }: AppShel
   const systemStatus = useSystemStatus();
   const serviceWarning = systemStatus.isError || systemStatus.data?.workerReady === false;
 
+  const focusMainContent = () => {
+    window.scrollTo({ top: 0, behavior: "auto" });
+    document.querySelector<HTMLElement>("#main-content")?.focus({ preventScroll: true });
+  };
+
   const navigate = (view: ViewKey) => {
     onNavigate(view);
     setMobileOpen(false);
     if (!SECONDARY_NAVIGATION.some((item) => item.id === view)) setMoreOpen(false);
-    window.requestAnimationFrame(() => {
-      window.scrollTo({ top: 0, behavior: "auto" });
-      document.querySelector<HTMLElement>("#main-content")?.focus({ preventScroll: true });
-    });
+    window.requestAnimationFrame(focusMainContent);
   };
 
   const cycleTheme = () => {
@@ -63,9 +65,23 @@ export function AppShell({ activeView, onNavigate, children, demoMode }: AppShel
   const secondaryActive = SECONDARY_NAVIGATION.some((item) => item.id === activeView);
   const showSecondary = moreOpen || secondaryActive;
 
+  useEffect(() => {
+    const shouldRestoreContentFocus = mobileOpen;
+    setMobileOpen(false);
+    if (!secondaryActive) setMoreOpen(false);
+    if (shouldRestoreContentFocus) window.requestAnimationFrame(focusMainContent);
+  }, [activeView, secondaryActive]);
+
   return (
     <div className="app-shell">
-      <a className="skip-link" href="#main-content">
+      <a
+        className="skip-link"
+        href="#main-content"
+        onClick={(event) => {
+          event.preventDefault();
+          focusMainContent();
+        }}
+      >
         Skip to content
       </a>
       <header className="mobile-header">

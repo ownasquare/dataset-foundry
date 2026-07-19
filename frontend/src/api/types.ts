@@ -81,6 +81,11 @@ export interface CandidateScore {
   explanation: string;
 }
 
+export interface CandidateReason {
+  code: string;
+  evidence: string | null;
+}
+
 export interface Candidate {
   id: string;
   runId: string;
@@ -95,6 +100,7 @@ export interface Candidate {
   nearestSimilarity: number | null;
   nearestCandidateId: string | null;
   reasonCodes: string[];
+  qualityReasons: CandidateReason[];
   scores: CandidateScore[];
   reviewerNote: string | null;
   providerTrace: string;

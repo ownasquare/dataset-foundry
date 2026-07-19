@@ -164,6 +164,11 @@ class RunView(ApiModel):
     finished_at: datetime | None
 
 
+class QualityReasonView(ApiModel):
+    code: str
+    evidence: str | None = None
+
+
 class CandidateView(ApiModel):
     id: str
     run_id: str
@@ -172,6 +177,7 @@ class CandidateView(ApiModel):
     effective_decision: CandidateDecision | None
     quality_score: float | None
     reason_codes: list[str]
+    quality_reasons: list[QualityReasonView]
     components: list[QualityComponent]
     explanations: list[str]
     nearest_match_id: str | None
@@ -201,6 +207,7 @@ class ReviewView(ApiModel):
 
 
 class ExportCreate(ApiModel):
+    project_id: str | None = Field(default=None, min_length=1, max_length=128)
     name: str = Field(default="Dataset export", min_length=1, max_length=120)
     formats: list[ExportFormat] = Field(
         default_factory=lambda: list(ExportFormat),

@@ -13,11 +13,21 @@ from dataset_foundry.persistence import RecordNotFoundError
 
 
 class ApiProblem(RuntimeError):
-    def __init__(self, status: int, title: str, detail: str) -> None:
+    def __init__(
+        self,
+        status: int,
+        title: str,
+        detail: str,
+        *,
+        code: str = "request_failed",
+        errors: list[dict[str, Any]] | None = None,
+    ) -> None:
         super().__init__(detail)
         self.status = status
         self.title = title
         self.detail = detail
+        self.code = code
+        self.errors = errors
 
 
 def _problem(
@@ -26,6 +36,7 @@ def _problem(
     status: int,
     title: str,
     detail: str,
+    code: str,
     errors: list[dict[str, Any]] | None = None,
 ) -> JSONResponse:
     body: dict[str, Any] = {
@@ -33,6 +44,7 @@ def _problem(
         "title": title,
         "status": status,
         "detail": detail,
+        "code": code,
         "instance": request.url.path,
         "request_id": getattr(request.state, "request_id", "unknown"),
     }
@@ -49,15 +61,29 @@ def install_error_handlers(app: FastAPI) -> None:
             status=exc.status,
             title=exc.title,
             detail=exc.detail,
+            code=exc.code,
+            errors=exc.errors,
         )
 
     @app.exception_handler(RecordNotFoundError)
     async def not_found_handler(request: Request, exc: RecordNotFoundError) -> JSONResponse:
-        return _problem(request, status=404, title="Not found", detail=str(exc))
+        return _problem(
+            request,
+            status=404,
+            title="Not found",
+            detail=str(exc),
+            code="record_not_found",
+        )
 
     @app.exception_handler(IngestionError)
     async def ingestion_handler(request: Request, exc: IngestionError) -> JSONResponse:
-        return _problem(request, status=422, title="Invalid seed dataset", detail=str(exc))
+        return _problem(
+            request,
+            status=422,
+            title="Invalid seed dataset",
+            detail=str(exc),
+            code="invalid_seed_dataset",
+        )
 
     @app.exception_handler(RequestValidationError)
     async def validation_handler(
@@ -77,6 +103,7 @@ def install_error_handlers(app: FastAPI) -> None:
             status=422,
             title="Validation error",
             detail="The request did not match the expected contract.",
+            code="request_validation_failed",
             errors=errors,
         )
 
@@ -87,4 +114,5 @@ def install_error_handlers(app: FastAPI) -> None:
             status=500,
             title="Internal server error",
             detail="The request could not be completed. Use the request ID to inspect logs.",
+            code="internal_error",
         )
